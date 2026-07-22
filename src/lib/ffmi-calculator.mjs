@@ -36,13 +36,13 @@ export const TRAINING_LEVELS = {
 
 export const FFMI_RANGE_LIMITS = {
   ENHANCED_ELITE: {
-    label: "Very High FFMI Reference Range",
+    label: "Very High FFMI (Elite Steroid/Enhanced Range)",
     maleFFMI: 30,
     femaleFFMI: 25,
     stroke: "#c026d3",
   },
   ENHANCED_TERRITORY: {
-    label: "High FFMI Reference Range",
+    label: "High FFMI (Steroid/Enhanced Range)",
     maleFFMI: 27,
     femaleFFMI: 23,
     stroke: "#d946ef",
@@ -94,15 +94,19 @@ export const FFMI_RANGE_LIMITS = {
 export const UNITS = {
   METRIC: "metric",
   IMPERIAL: "imperial",
+  UK: "uk",
 };
 
 export const WEIGHT_RANGES = {
   [UNITS.METRIC]: { min: 30, max: 450 },
   [UNITS.IMPERIAL]: { min: 66, max: 1000 },
+  [UNITS.UK]: { min: 66, max: 1000 },
 };
 
 export const BODY_FAT_RANGE = { min: 3, max: 75 };
 export const TEE_MULTIPLIER_RANGE = { min: 0.75, max: 1.35 };
+export const BODY_FAT_UNCERTAINTY_RANGE = { min: 0, max: 10 };
+export const TEE_UNCERTAINTY_RANGE = { min: 0, max: 0.3 };
 
 export const SEX = {
   MALE: "male",
@@ -110,16 +114,18 @@ export const SEX = {
 };
 
 export const DEFAULT_METRICS = {
-  weight: 219,
-  height: 73.5,
-  bodyFat: 31.7,
+  weight: 220,
+  height: 74,
+  bodyFat: 32,
   age: 40,
   sex: SEX.MALE,
   unit: UNITS.IMPERIAL,
   feet: 6,
-  inches: 1.5,
+  inches: 2,
   enhanced: false,
   teeMultiplier: 1,
+  bodyFatUncertainty: 3,
+  teeUncertainty: 0.1,
   barbieriFast: false,
   years: 4,
   trainingLevel: "DEDICATED",
@@ -129,9 +135,29 @@ export const convertWeightToMetric = (lbs) => lbs * 0.453592;
 export const convertHeightToMetric = (inches) => inches * 2.54;
 export const convertWeightToImperial = (kg) => kg * 2.20462;
 export const convertHeightToImperial = (cm) => cm / 2.54;
+export const usesImperialHeight = (unit) => unit !== UNITS.METRIC;
+export const usesPoundWeight = (unit) => unit !== UNITS.METRIC;
+export const convertWeightForDisplay = (kg, unit) => {
+  if (unit === UNITS.METRIC) return kg;
+  const pounds = convertWeightToImperial(kg);
+  return unit === UNITS.UK ? pounds / 14 : pounds;
+};
+export const convertDisplayedWeightToMetric = (weight, unit) => {
+  if (unit === UNITS.METRIC) return weight;
+  return convertWeightToMetric(unit === UNITS.UK ? weight * 14 : weight);
+};
+export const splitPoundsIntoStone = (totalPounds) => {
+  let stones = Math.floor(Number(totalPounds) / 14);
+  let pounds = Math.round((Number(totalPounds) - stones * 14) * 10) / 10;
+  if (pounds >= 14) {
+    stones += 1;
+    pounds = 0;
+  }
+  return { stones, pounds };
+};
 
 export const getHeightInMeters = (height, unit) =>
-  unit === UNITS.IMPERIAL ? height * 0.0254 : height / 100;
+  usesImperialHeight(unit) ? height * 0.0254 : height / 100;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -161,10 +187,19 @@ export const isMetricsValid = (metrics) => {
     return false;
   }
 
-  const hasValidHeight = metrics.unit === UNITS.IMPERIAL
+  const hasValidHeight = usesImperialHeight(metrics.unit)
     ? isNumberInRange(metrics.feet, 4, 8, true) &&
       isNumberInRange(metrics.inches, 0, 11.9)
     : isNumberInRange(metrics.height, 120, 220);
+  const hasValidUKWeight = metrics.unit !== UNITS.UK ||
+    (
+      isNumberInRange(metrics.stones, 4, 71, true) &&
+      isNumberInRange(metrics.stonePounds, 0, 13.9) &&
+      Math.abs(
+        Number(metrics.weight) -
+          (Number(metrics.stones) * 14 + Number(metrics.stonePounds)),
+      ) < 0.11
+    );
 
   return (
     isNumberInRange(
@@ -173,12 +208,23 @@ export const isMetricsValid = (metrics) => {
       WEIGHT_RANGES[metrics.unit].max,
     ) &&
     hasValidHeight &&
+    hasValidUKWeight &&
     isNumberInRange(metrics.bodyFat, BODY_FAT_RANGE.min, BODY_FAT_RANGE.max) &&
     isNumberInRange(metrics.age, 18, 100, true) &&
     isNumberInRange(
       metrics.teeMultiplier,
       TEE_MULTIPLIER_RANGE.min,
       TEE_MULTIPLIER_RANGE.max,
+    ) &&
+    isNumberInRange(
+      metrics.bodyFatUncertainty,
+      BODY_FAT_UNCERTAINTY_RANGE.min,
+      BODY_FAT_UNCERTAINTY_RANGE.max,
+    ) &&
+    isNumberInRange(
+      metrics.teeUncertainty,
+      TEE_UNCERTAINTY_RANGE.min,
+      TEE_UNCERTAINTY_RANGE.max,
     ) &&
     isNumberInRange(metrics.years, 1, 10, true)
   );
@@ -193,16 +239,18 @@ export const normalizeMetrics = (metrics, fallback = DEFAULT_METRICS) => {
   const sex = Object.values(SEX).includes(metrics.sex) ? metrics.sex : fallback.sex;
   const feet = clamp(toFiniteNumber(metrics.feet, fallback.feet), 4, 8);
   const inches = clamp(toFiniteNumber(metrics.inches, fallback.inches), 0, 11.9);
-  const height = unit === UNITS.IMPERIAL
+  const height = usesImperialHeight(unit)
     ? feet * 12 + inches
     : clamp(toFiniteNumber(metrics.height, fallback.height), 120, 220);
+  const weight = clamp(
+    toFiniteNumber(metrics.weight, fallback.weight),
+    WEIGHT_RANGES[unit].min,
+    WEIGHT_RANGES[unit].max,
+  );
+  const stoneParts = splitPoundsIntoStone(weight);
 
   return {
-    weight: clamp(
-      toFiniteNumber(metrics.weight, fallback.weight),
-      WEIGHT_RANGES[unit].min,
-      WEIGHT_RANGES[unit].max,
-    ),
+    weight,
     height,
     bodyFat: clamp(
       toFiniteNumber(metrics.bodyFat, fallback.bodyFat),
@@ -214,11 +262,30 @@ export const normalizeMetrics = (metrics, fallback = DEFAULT_METRICS) => {
     unit,
     feet,
     inches,
+    ...(unit === UNITS.UK
+      ? {
+          stones: stoneParts.stones,
+          stonePounds: stoneParts.pounds,
+        }
+      : {}),
     enhanced: Boolean(metrics.enhanced),
     teeMultiplier: clamp(
       toFiniteNumber(metrics.teeMultiplier, fallback.teeMultiplier),
       TEE_MULTIPLIER_RANGE.min,
       TEE_MULTIPLIER_RANGE.max,
+    ),
+    bodyFatUncertainty: clamp(
+      toFiniteNumber(
+        metrics.bodyFatUncertainty,
+        fallback.bodyFatUncertainty,
+      ),
+      BODY_FAT_UNCERTAINTY_RANGE.min,
+      BODY_FAT_UNCERTAINTY_RANGE.max,
+    ),
+    teeUncertainty: clamp(
+      toFiniteNumber(metrics.teeUncertainty, fallback.teeUncertainty),
+      TEE_UNCERTAINTY_RANGE.min,
+      TEE_UNCERTAINTY_RANGE.max,
     ),
     barbieriFast: Boolean(metrics.barbieriFast),
     years: clamp(toFiniteNumber(metrics.years, fallback.years), 1, 10),
@@ -229,7 +296,7 @@ export const normalizeMetrics = (metrics, fallback = DEFAULT_METRICS) => {
 };
 
 export const calculateCurrentFFMI = (metrics) => {
-  const weightKg = metrics.unit === UNITS.IMPERIAL
+  const weightKg = usesPoundWeight(metrics.unit)
     ? convertWeightToMetric(Number(metrics.weight))
     : Number(metrics.weight);
   const heightM = getHeightInMeters(Number(metrics.height), metrics.unit);
@@ -241,13 +308,13 @@ export const calculateWeightFromFFMI = (ffmi, metrics) => {
   const heightM = getHeightInMeters(Number(metrics.height), metrics.unit);
   const leanMassKg = Number(ffmi) * heightM * heightM;
   const weightKg = leanMassKg / (1 - Number(metrics.bodyFat) / 100);
-  return metrics.unit === UNITS.IMPERIAL
+  return usesPoundWeight(metrics.unit)
     ? convertWeightToImperial(weightKg)
     : weightKg;
 };
 
 export const calculateBodyFatFromFFMI = (ffmi, metrics) => {
-  const weightKg = metrics.unit === UNITS.IMPERIAL
+  const weightKg = usesPoundWeight(metrics.unit)
     ? convertWeightToMetric(Number(metrics.weight))
     : Number(metrics.weight);
   const heightM = getHeightInMeters(Number(metrics.height), metrics.unit);
@@ -322,7 +389,7 @@ const getBodyFatBand = (bodyFat, sex) => {
 
 export const calculateTotalEnergyExpenditure = (metrics) => {
   const normalized = normalizeMetrics(metrics);
-  const weightKg = normalized.unit === UNITS.IMPERIAL
+  const weightKg = usesPoundWeight(normalized.unit)
     ? convertWeightToMetric(normalized.weight)
     : normalized.weight;
   const leanMassKg = weightKg * (1 - normalized.bodyFat / 100);
@@ -462,24 +529,13 @@ const simulateFatLossSpeed = ({
   return { initialState, finalState, monthly, targetStates };
 };
 
-let fatLossProjectionCacheKey;
-let fatLossProjectionCacheValue;
-
-export const calculateFatLossProjection = (metrics) => {
-  const normalized = normalizeMetrics(metrics);
-  const cacheKey = JSON.stringify(normalized);
-  if (cacheKey === fatLossProjectionCacheKey) {
-    return fatLossProjectionCacheValue;
-  }
-
-  const weightKg = normalized.unit === UNITS.IMPERIAL
+const createFatLossSimulationInputs = (normalized) => {
+  const weightKg = usesPoundWeight(normalized.unit)
     ? convertWeightToMetric(normalized.weight)
     : normalized.weight;
   const fatMassKg = weightKg * normalized.bodyFat / 100;
   const leanMassKg = weightKg - fatMassKg;
-  const fatMassLb = convertWeightToImperial(fatMassKg);
   const initialTee = calculateTotalEnergyExpenditure(normalized);
-  const averageTee = initialTee / normalized.teeMultiplier;
   const minimumDailyIntake = normalized.barbieriFast
     ? 0
     : MINIMUM_DAILY_INTAKE_KCAL;
@@ -488,14 +544,44 @@ export const calculateFatLossProjection = (metrics) => {
   if (!stageLeanBand) {
     throw new Error(`No Stage lean band configured for ${normalized.sex}`);
   }
-  const minimumTarget = stageLeanBand.min;
   const targetBodyFats = BODY_FAT_BANDS[normalized.sex]
     .map((band) => band.min)
     .filter((bodyFat) =>
-      bodyFat >= minimumTarget && bodyFat < normalized.bodyFat
+      bodyFat >= stageLeanBand.min && bodyFat < normalized.bodyFat
     )
     .sort((a, b) => b - a);
-  const fluidShiftPotentialKg = clamp(weightKg * 0.015, 1.5, 3.6);
+
+  return {
+    weightKg,
+    fatMassKg,
+    leanMassKg,
+    initialTee,
+    minimumDailyIntake,
+    targetBodyFats,
+    fluidShiftPotentialKg: clamp(weightKg * 0.015, 1.5, 3.6),
+  };
+};
+
+const fatLossProjectionCache = new Map();
+
+export const calculateFatLossProjection = (metrics) => {
+  const normalized = normalizeMetrics(metrics);
+  const cacheKey = JSON.stringify(normalized);
+  if (fatLossProjectionCache.has(cacheKey)) {
+    return fatLossProjectionCache.get(cacheKey);
+  }
+
+  const {
+    weightKg,
+    fatMassKg,
+    leanMassKg,
+    initialTee,
+    minimumDailyIntake,
+    targetBodyFats,
+    fluidShiftPotentialKg,
+  } = createFatLossSimulationInputs(normalized);
+  const fatMassLb = convertWeightToImperial(fatMassKg);
+  const averageTee = initialTee / normalized.teeMultiplier;
   const simulations = Object.fromEntries(
     FAT_LOSS_SPEEDS.map((speed) => [
       speed.id,
@@ -523,9 +609,10 @@ export const calculateFatLossProjection = (metrics) => {
       range: band.range,
       description: band.description,
       color: band.color,
-      targetWeight: normalized.unit === UNITS.IMPERIAL
-        ? convertWeightToImperial(moderateState.scaleWeightKg)
-        : moderateState.scaleWeightKg,
+      targetWeight: convertWeightForDisplay(
+        moderateState.scaleWeightKg,
+        normalized.unit,
+      ),
       maxDailyDeficit: moderateState.maxDailyDeficit,
       daysBySpeed: Object.fromEntries(
         FAT_LOSS_SPEEDS.map((speed) => [
@@ -537,12 +624,15 @@ export const calculateFatLossProjection = (metrics) => {
   });
 
   const getModerateWeightAtBodyFat = (bodyFat) => {
-    if (bodyFat === normalized.bodyFat) return normalized.weight;
+    if (bodyFat === normalized.bodyFat) {
+      return convertWeightForDisplay(weightKg, normalized.unit);
+    }
     const targetState = moderateSimulation.targetStates[bodyFat];
     if (targetState) {
-      return normalized.unit === UNITS.IMPERIAL
-        ? convertWeightToImperial(targetState.scaleWeightKg)
-        : targetState.scaleWeightKg;
+      return convertWeightForDisplay(
+        targetState.scaleWeightKg,
+        normalized.unit,
+      );
     }
 
     const referenceState = moderateSimulation.finalState;
@@ -553,9 +643,7 @@ export const calculateFatLossProjection = (metrics) => {
       referenceState.leanMassKg +
       extrapolatedFatMassKg -
       referenceState.fluidLossKg;
-    return normalized.unit === UNITS.IMPERIAL
-      ? convertWeightToImperial(scaleWeightKg)
-      : scaleWeightKg;
+    return convertWeightForDisplay(scaleWeightKg, normalized.unit);
   };
 
   const bodyFatBands = BODY_FAT_BANDS[normalized.sex]
@@ -598,18 +686,21 @@ export const calculateFatLossProjection = (metrics) => {
       minimumDailyIntake,
       minimumIntakeToStayWithinAdiposeFlux,
       barbieriFast: normalized.barbieriFast,
-      fluidShiftPotential: normalized.unit === UNITS.IMPERIAL
-        ? convertWeightToImperial(fluidShiftPotentialKg)
-        : fluidShiftPotentialKg,
+      fluidShiftPotential: convertWeightForDisplay(
+        fluidShiftPotentialKg,
+        normalized.unit,
+      ),
     },
     simulations,
   };
-  fatLossProjectionCacheKey = cacheKey;
-  fatLossProjectionCacheValue = result;
+  fatLossProjectionCache.set(cacheKey, result);
+  if (fatLossProjectionCache.size > 12) {
+    fatLossProjectionCache.delete(fatLossProjectionCache.keys().next().value);
+  }
   return result;
 };
 
-export const calculateWeightLossChart = (metrics) => {
+const calculateWeightLossChartBase = (metrics) => {
   const normalized = normalizeMetrics(metrics);
   const projection = calculateFatLossProjection(normalized);
   if (projection.targets.length === 0) {
@@ -633,9 +724,10 @@ export const calculateWeightLossChart = (metrics) => {
     FAT_LOSS_SPEEDS.forEach((speed) => {
       const simulation = projection.simulations[speed.id];
       const state = simulation.monthly[month] ?? simulation.finalState;
-      point[speed.id] = normalized.unit === UNITS.IMPERIAL
-        ? convertWeightToImperial(state.scaleWeightKg)
-        : state.scaleWeightKg;
+      point[speed.id] = convertWeightForDisplay(
+        state.scaleWeightKg,
+        normalized.unit,
+      );
       point[`${speed.id}Deficit`] =
         month * DAYS_PER_MONTH >= simulation.finalState.day
           ? 0
@@ -654,11 +746,138 @@ export const calculateWeightLossChart = (metrics) => {
   };
 };
 
+const createSensitivitySamples = (minimum, maximum, center, count = 9) => {
+  if (minimum === maximum) return [minimum];
+
+  return [...new Set([
+    ...Array.from(
+      { length: count },
+      (_, index) => minimum + (maximum - minimum) * index / (count - 1),
+    ),
+    center,
+  ])].sort((a, b) => a - b);
+};
+
+const simulateSensitivityScenario = (normalized) => {
+  const inputs = createFatLossSimulationInputs(normalized);
+  return Object.fromEntries(
+    FAT_LOSS_SPEEDS.map((speed) => [
+      speed.id,
+      simulateFatLossSpeed({ ...inputs, speed }),
+    ]),
+  );
+};
+
+const weightLossChartCache = new Map();
+
+export const calculateWeightLossChart = (metrics) => {
+  const normalized = normalizeMetrics(metrics);
+  const cacheKey = JSON.stringify(normalized);
+  if (weightLossChartCache.has(cacheKey)) {
+    return weightLossChartCache.get(cacheKey);
+  }
+
+  const chart = calculateWeightLossChartBase(normalized);
+  if (chart.data.length === 0) {
+    const emptyResult = {
+      ...chart,
+      sensitivity: {
+        bodyFat: normalized.bodyFatUncertainty,
+        tee: normalized.teeUncertainty,
+      },
+    };
+    weightLossChartCache.set(cacheKey, emptyResult);
+    if (weightLossChartCache.size > 12) {
+      weightLossChartCache.delete(weightLossChartCache.keys().next().value);
+    }
+    return emptyResult;
+  }
+
+  const bodyFatMinimum = clamp(
+    normalized.bodyFat - normalized.bodyFatUncertainty,
+    BODY_FAT_RANGE.min,
+    BODY_FAT_RANGE.max,
+  );
+  const bodyFatMaximum = clamp(
+    normalized.bodyFat + normalized.bodyFatUncertainty,
+    BODY_FAT_RANGE.min,
+    BODY_FAT_RANGE.max,
+  );
+  const teeMinimum = clamp(
+    normalized.teeMultiplier - normalized.teeUncertainty,
+    TEE_MULTIPLIER_RANGE.min,
+    TEE_MULTIPLIER_RANGE.max,
+  );
+  const teeMaximum = clamp(
+    normalized.teeMultiplier + normalized.teeUncertainty,
+    TEE_MULTIPLIER_RANGE.min,
+    TEE_MULTIPLIER_RANGE.max,
+  );
+  const bodyFatSamples = createSensitivitySamples(
+    bodyFatMinimum,
+    bodyFatMaximum,
+    normalized.bodyFat,
+    Math.ceil((bodyFatMaximum - bodyFatMinimum) / 0.5) + 1,
+  );
+  const teeSamples = createSensitivitySamples(
+    teeMinimum,
+    teeMaximum,
+    normalized.teeMultiplier,
+    3,
+  );
+  const scenarios = bodyFatSamples.flatMap((bodyFat) =>
+    teeSamples.map((teeMultiplier) =>
+      simulateSensitivityScenario({
+        ...normalized,
+        bodyFat,
+        teeMultiplier,
+      }),
+    ),
+  );
+
+  const result = {
+    ...chart,
+    data: chart.data.map((point) => {
+      const sensitivityRanges = Object.fromEntries(
+        FAT_LOSS_SPEEDS.map((speed) => {
+          const weights = [
+            Number(point[speed.id]),
+            ...scenarios.map((scenario) => {
+              const simulation = scenario[speed.id];
+              const state =
+                simulation.monthly[point.month] ?? simulation.finalState;
+              return convertWeightForDisplay(
+                state.scaleWeightKg,
+                normalized.unit,
+              );
+            }),
+          ];
+          return [
+            `${speed.id}Sensitivity`,
+            [Math.min(...weights), Math.max(...weights)],
+          ];
+        }),
+      );
+      return {
+        ...point,
+        ...sensitivityRanges,
+      };
+    }),
+    sensitivity: {
+      bodyFat: normalized.bodyFatUncertainty,
+      tee: normalized.teeUncertainty,
+    },
+  };
+  weightLossChartCache.set(cacheKey, result);
+  if (weightLossChartCache.size > 12) {
+    weightLossChartCache.delete(weightLossChartCache.keys().next().value);
+  }
+  return result;
+};
+
 export const calculateLeanMassFromFFMI = (ffmi, heightM, unit) => {
   const leanMassKg = ffmi * (heightM * heightM);
-  return unit === UNITS.IMPERIAL
-    ? convertWeightToImperial(leanMassKg)
-    : leanMassKg;
+  return convertWeightForDisplay(leanMassKg, unit);
 };
 
 const getUrlParam = (urlParams, param, defaultValue, validate) => {
@@ -682,99 +901,174 @@ const getUrlParam = (urlParams, param, defaultValue, validate) => {
   }
 };
 
-export const parseMetrics = (search, isMobile) => {
+export const parseMetrics = (
+  search,
+  isMobile,
+  defaults = DEFAULT_METRICS,
+) => {
   const urlParams = new URLSearchParams(search);
+  const fallback = { ...DEFAULT_METRICS, ...defaults };
   const unit = getUrlParam(
     urlParams,
     "unit",
-    DEFAULT_METRICS.unit,
+    fallback.unit,
     (value) =>
-      Object.values(UNITS).includes(value) ? value : UNITS.IMPERIAL,
+      Object.values(UNITS).includes(value) ? value : fallback.unit,
   );
+  const fallbackHeightCm = usesImperialHeight(fallback.unit)
+    ? convertHeightToMetric(fallback.height)
+    : fallback.height;
+  const fallbackHeightInches = convertHeightToImperial(fallbackHeightCm);
+  const fallbackHeight = unit === fallback.unit
+    ? fallback.height
+    : usesImperialHeight(unit)
+      ? fallbackHeightInches
+      : fallbackHeightCm;
+  const fallbackWeightKg = usesPoundWeight(fallback.unit)
+    ? convertWeightToMetric(fallback.weight)
+    : fallback.weight;
+  const fallbackWeight = unit === fallback.unit
+    ? fallback.weight
+    : usesPoundWeight(unit)
+      ? convertWeightToImperial(fallbackWeightKg)
+      : fallbackWeightKg;
+  const fallbackFeet = fallback.feet;
+  const fallbackInches = fallback.inches;
   const feet = getUrlParam(
     urlParams,
     "feet",
-    DEFAULT_METRICS.feet,
+    fallbackFeet,
     (value) => Math.max(4, Math.min(8, value)),
   );
   const inches = getUrlParam(
     urlParams,
     "inches",
-    DEFAULT_METRICS.inches,
+    fallbackInches,
     (value) => Math.max(0, Math.min(11.9, value)),
   );
   const height =
-    unit === UNITS.IMPERIAL
+    usesImperialHeight(unit)
       ? feet * 12 + inches
       : getUrlParam(
           urlParams,
           "height",
-          DEFAULT_METRICS.height,
+          fallbackHeight,
           (value) => Math.max(120, Math.min(220, value)),
         );
 
+  const parsedWeight = getUrlParam(
+    urlParams,
+    "weight",
+    fallbackWeight,
+    (value) =>
+      Math.max(
+        WEIGHT_RANGES[unit].min,
+        Math.min(WEIGHT_RANGES[unit].max, value),
+      ),
+  );
+  const fallbackStoneParts = splitPoundsIntoStone(parsedWeight);
+  const stones = getUrlParam(
+    urlParams,
+    "stones",
+    fallbackStoneParts.stones,
+    (value) => Math.max(4, Math.min(71, Math.trunc(value))),
+  );
+  const stonePounds = getUrlParam(
+    urlParams,
+    "stonePounds",
+    fallbackStoneParts.pounds,
+    (value) => Math.max(0, Math.min(13.9, value)),
+  );
+  const weight = unit === UNITS.UK &&
+      (urlParams.has("stones") || urlParams.has("stonePounds"))
+    ? Math.max(
+        WEIGHT_RANGES[unit].min,
+        Math.min(WEIGHT_RANGES[unit].max, stones * 14 + stonePounds),
+      )
+    : parsedWeight;
+  const synchronizedStoneParts = splitPoundsIntoStone(weight);
+
   return {
-    weight: getUrlParam(
-      urlParams,
-      "weight",
-      DEFAULT_METRICS.weight,
-      (value) =>
-        Math.max(
-          WEIGHT_RANGES[unit].min,
-          Math.min(WEIGHT_RANGES[unit].max, value),
-        ),
-    ),
+    weight,
     height,
     bodyFat: getUrlParam(
       urlParams,
       "bodyFat",
-      DEFAULT_METRICS.bodyFat,
+      fallback.bodyFat,
       (value) =>
         Math.max(BODY_FAT_RANGE.min, Math.min(BODY_FAT_RANGE.max, value)),
     ),
     age: getUrlParam(
       urlParams,
       "age",
-      DEFAULT_METRICS.age,
+      fallback.age,
       (value) => Math.max(18, Math.min(100, value)),
     ),
     sex: getUrlParam(
       urlParams,
       "sex",
-      DEFAULT_METRICS.sex,
-      (value) => (Object.values(SEX).includes(value) ? value : SEX.MALE),
+      fallback.sex,
+      (value) => (Object.values(SEX).includes(value) ? value : fallback.sex),
     ),
     unit,
     feet,
     inches,
-    enhanced: getUrlParam(urlParams, "enhanced", DEFAULT_METRICS.enhanced),
+    ...(unit === UNITS.UK
+      ? {
+          stones: synchronizedStoneParts.stones,
+          stonePounds: synchronizedStoneParts.pounds,
+        }
+      : {}),
+    enhanced: getUrlParam(urlParams, "enhanced", fallback.enhanced),
     teeMultiplier: getUrlParam(
       urlParams,
       "teeMultiplier",
-      DEFAULT_METRICS.teeMultiplier,
+      fallback.teeMultiplier,
       (value) =>
         Math.max(
           TEE_MULTIPLIER_RANGE.min,
           Math.min(TEE_MULTIPLIER_RANGE.max, value),
         ),
     ),
+    bodyFatUncertainty: getUrlParam(
+      urlParams,
+      "bodyFatUncertainty",
+      fallback.bodyFatUncertainty,
+      (value) =>
+        Math.max(
+          BODY_FAT_UNCERTAINTY_RANGE.min,
+          Math.min(BODY_FAT_UNCERTAINTY_RANGE.max, value),
+        ),
+    ),
+    teeUncertainty: getUrlParam(
+      urlParams,
+      "teeUncertainty",
+      fallback.teeUncertainty,
+      (value) =>
+        Math.max(
+          TEE_UNCERTAINTY_RANGE.min,
+          Math.min(TEE_UNCERTAINTY_RANGE.max, value),
+        ),
+    ),
     barbieriFast: getUrlParam(
       urlParams,
       "barbieriFast",
-      DEFAULT_METRICS.barbieriFast,
+      fallback.barbieriFast,
     ),
     years: getUrlParam(
       urlParams,
       "years",
-      isMobile ? 2 : DEFAULT_METRICS.years,
+      isMobile ? 2 : fallback.years,
       (value) => Math.max(1, Math.min(10, value)),
     ),
     trainingLevel: getUrlParam(
       urlParams,
       "trainingLevel",
-      DEFAULT_METRICS.trainingLevel,
+      fallback.trainingLevel,
       (value) =>
-        Object.keys(TRAINING_LEVELS).includes(value) ? value : "DEDICATED",
+        Object.keys(TRAINING_LEVELS).includes(value)
+          ? value
+          : fallback.trainingLevel,
     ),
   };
 };
@@ -813,7 +1107,7 @@ const calculateFFMIChange = ({
 export const calculateProjection = (metrics) => {
   metrics = normalizeMetrics(metrics);
   const weightKg =
-    metrics.unit === UNITS.IMPERIAL
+    usesPoundWeight(metrics.unit)
       ? convertWeightToMetric(metrics.weight)
       : metrics.weight;
   const heightM = getHeightInMeters(metrics.height, metrics.unit);
@@ -821,20 +1115,24 @@ export const calculateProjection = (metrics) => {
   const bmi = weightKg / (heightM * heightM);
   let currentFfmi = leanMass / (heightM * heightM);
   const initialLeanMassKg = currentFfmi * (heightM * heightM);
-  const initialLeanMass =
-    metrics.unit === UNITS.IMPERIAL
-      ? convertWeightToImperial(initialLeanMassKg)
-      : initialLeanMassKg;
+  const initialLeanMass = convertWeightForDisplay(
+    initialLeanMassKg,
+    metrics.unit,
+  );
   const data = [];
 
   for (let month = 0; month <= metrics.years * 12; month += 1) {
     const leanMassKg = currentFfmi * (heightM * heightM);
-    const projectedLeanMass =
-      metrics.unit === UNITS.IMPERIAL
-        ? convertWeightToImperial(leanMassKg)
-        : leanMassKg;
+    const projectedLeanMass = convertWeightForDisplay(
+      leanMassKg,
+      metrics.unit,
+    );
     const gained = projectedLeanMass - initialLeanMass;
-    const unit = metrics.unit === UNITS.METRIC ? "kg" : "lbs";
+    const unit = metrics.unit === UNITS.METRIC
+      ? "kg"
+      : metrics.unit === UNITS.UK
+        ? "st"
+        : "lbs";
 
     data.push({
       month,
@@ -858,4 +1156,49 @@ export const calculateProjection = (metrics) => {
   }
 
   return data;
+};
+
+export const calculateProjectionSensitivity = (metrics) => {
+  const normalized = normalizeMetrics(metrics);
+  const projection = calculateProjection(normalized);
+  const scenarios = [
+    clamp(
+      normalized.bodyFat - normalized.bodyFatUncertainty,
+      BODY_FAT_RANGE.min,
+      BODY_FAT_RANGE.max,
+    ),
+    clamp(
+      normalized.bodyFat + normalized.bodyFatUncertainty,
+      BODY_FAT_RANGE.min,
+      BODY_FAT_RANGE.max,
+    ),
+  ].map((bodyFat) =>
+    calculateProjection({
+      ...normalized,
+      bodyFat,
+    }),
+  );
+
+  return projection.map((point, index) => {
+    const leanMassValues = [
+      Number(point.leanMass),
+      ...scenarios.map((scenario) => Number(scenario[index].leanMass)),
+    ];
+    const ffmiValues = [
+      Number(point.ffmi),
+      ...scenarios.map((scenario) => Number(scenario[index].ffmi)),
+    ];
+
+    return {
+      ...point,
+      leanMassSensitivity: [
+        Math.min(...leanMassValues),
+        Math.max(...leanMassValues),
+      ],
+      ffmiSensitivity: [
+        Math.min(...ffmiValues),
+        Math.max(...ffmiValues),
+      ],
+    };
+  });
 };

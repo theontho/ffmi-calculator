@@ -1,14 +1,13 @@
 import {
   FFMI_RANGE_LIMITS,
   SEX,
-  UNITS,
   calculateLeanMassFromFFMI,
-  convertWeightToMetric,
+  convertDisplayedWeightToMetric,
   getHeightInMeters,
 } from "./ffmi-calculator.mjs";
 
 const getLeanMassInKg = (leanMass, unit) =>
-  unit === UNITS.IMPERIAL ? convertWeightToMetric(leanMass) : leanMass;
+  convertDisplayedWeightToMetric(leanMass, unit);
 
 const getRelevantFFMILimits = (sex, enhanced) =>
   Object.values(FFMI_RANGE_LIMITS)

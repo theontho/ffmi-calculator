@@ -16,7 +16,7 @@ export default function CalculatorCharts({
             : "grid grid-cols-1 gap-6"
         }>
             {renderLineChart(chartData, projectedMetrics, Boolean(validMetrics))}
-            {validMetrics && renderWeightLossChart(validMetrics)}
+            {validMetrics && renderWeightLossChart(projectedMetrics)}
         </div>
     );
 }

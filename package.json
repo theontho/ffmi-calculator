@@ -13,10 +13,11 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
+    "generate:locale-data": "node scripts/generate-locale-defaults.mjs",
     "build": "next build",
     "build:pages": "GITHUB_ACTIONS=true GITHUB_REPOSITORY=theontho/ffmi-calculator next build",
     "lint": "eslint .",
-    "test": "node --test test/ffmi-calculator.test.mjs",
+    "test": "node --test test/*.test.mjs",
     "test:e2e": "playwright test",
     "test:pages": "npm run build:pages && npm run validate:pages",
     "validate:pages": "node scripts/validate-pages-export.mjs",
@@ -36,6 +37,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.13.3",
