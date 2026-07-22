@@ -112,6 +112,7 @@ test("preserves and clamps the complete shared-query contract", () => {
     inches: 11.9,
     enhanced: true,
     teeMultiplier: 1,
+    sensitivityEnabled: false,
     bodyFatUncertainty: 3,
     teeUncertainty: 0.1,
     barbieriFast: false,
@@ -132,7 +133,7 @@ test("derives imperial height from feet and inches and serializes every field", 
     serializeMetrics(metrics),
     "weight=165.5&height=67.5&bodyFat=14.5&age=35&sex=female&unit=imperial" +
       "&feet=5&inches=7.5&enhanced=false&teeMultiplier=1" +
-      "&bodyFatUncertainty=3&teeUncertainty=0.1&barbieriFast=false" +
+      "&sensitivityEnabled=false&bodyFatUncertainty=3&teeUncertainty=0.1&barbieriFast=false" +
       "&years=3&trainingLevel=ELITE",
   );
 });
@@ -178,6 +179,7 @@ test("supports exceptional imperial weight and body-fat inputs", () => {
   assert.equal(metrics.teeMultiplier, 1.35);
   assert.equal(metrics.bodyFatUncertainty, 10);
   assert.equal(metrics.teeUncertainty, 0.3);
+  assert.equal(metrics.sensitivityEnabled, true);
   assert.equal(metrics.barbieriFast, true);
 });
 
@@ -201,8 +203,11 @@ test("keeps deterministic projection semantics", () => {
   });
 });
 
-test("builds ordered muscle-gain sensitivity envelopes", () => {
-  const projection = calculateProjectionSensitivity(DEFAULT_METRICS);
+test("builds ordered muscle-gain sensitivity envelopes when enabled", () => {
+  const projection = calculateProjectionSensitivity({
+    ...DEFAULT_METRICS,
+    sensitivityEnabled: true,
+  });
 
   assert.equal(projection.length, 49);
   assert.ok(projection.every((point) => {
@@ -468,7 +473,7 @@ test("compares a CALERIE-informed operating point with its published endpoint", 
   assert.ok(modeledLeanLossKg < 3.3 * 0.4);
 });
 
-test("documents the adipose-flux boundary in the Friedl Ranger cohort", () => {
+test("documents the adipose-flux boundary in the Friedl Army training cohort", () => {
   const metrics = {
     ...DEFAULT_METRICS,
     weight: 176,
@@ -550,7 +555,10 @@ test("uses researched sex-specific fitness and aesthetic bands", () => {
 });
 
 test("builds ordered weight-loss curves through the moderate-speed cutoff", () => {
-  const chart = calculateWeightLossChart(DEFAULT_METRICS);
+  const chart = calculateWeightLossChart({
+    ...DEFAULT_METRICS,
+    sensitivityEnabled: true,
+  });
   const projection = calculateFatLossProjection(DEFAULT_METRICS);
   const first = chart.data[0];
   const second = chart.data[1];
@@ -579,7 +587,11 @@ test("builds ordered weight-loss curves through the moderate-speed cutoff", () =
   assert.ok(Math.abs(last.fast - targetWeight) < 0.05);
   assert.ok(Math.abs(last.maximum - targetWeight) < 0.06);
   assert.equal(last.maximumDeficit, 0);
-  assert.deepEqual(chart.sensitivity, { bodyFat: 3, tee: 0.1 });
+  assert.deepEqual(chart.sensitivity, {
+    enabled: true,
+    bodyFat: 3,
+    tee: 0.1,
+  });
   assert.ok(chart.speeds.every((speed) =>
     chart.data.every((point) => {
       const [low, high] = point[`${speed.id}Sensitivity`];
@@ -617,6 +629,11 @@ test("collapses sensitivity envelopes when uncertainty is disabled", () => {
       )
     )
   ));
+  assert.deepEqual(chart.sensitivity, {
+    enabled: false,
+    bodyFat: 0,
+    tee: 0,
+  });
 });
 
 test("includes nonlinear interior scenarios in the fat-loss sensitivity band", () => {
@@ -625,6 +642,7 @@ test("includes nonlinear interior scenarios in the fat-loss sensitivity band", (
     weight: 500,
     bodyFat: 65,
     teeMultiplier: 0.75,
+    sensitivityEnabled: true,
     bodyFatUncertainty: 10,
     teeUncertainty: 0.3,
   };

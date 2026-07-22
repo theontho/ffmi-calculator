@@ -41,7 +41,7 @@ test("switches units and exposes the supervised fasting floor", async ({ page })
   await expect(page.getByRole("img", { name: /Projected weight in st/ }))
     .toBeVisible();
 
-  await page.getByText("Advanced fat-loss settings").click();
+  await page.getByText("Advanced fat-loss settings", { exact: true }).click();
   await page.locator("#barbieri-fast").check();
   await expect(page).toHaveURL(/barbieriFast=true/);
   await expect(page.getByText(/current 0 kcal\/day intake floor/)).toBeVisible();
@@ -84,9 +84,16 @@ test("shows FFMI and calorie rates in chart tooltips", async ({ page }) => {
 test("persists sensitivity presets and describes both projection bands", async ({ page }) => {
   await page.goto("./");
 
-  await page.getByText("Advanced fat-loss settings").click();
+  await expect(page.getByRole("img", { name: /Projected lean mass/ })
+    .locator(".recharts-area-area")).toHaveCount(0);
+  await expect(page.getByRole("img", { name: /Projected weight/ })
+    .locator(".recharts-area-area")).toHaveCount(0);
+  await page.getByText("Advanced fat-loss settings", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "Consumer" })).toHaveCount(0);
+  await page.locator("#sensitivity-enabled").check();
   await page.getByRole("button", { name: "Consumer" }).click();
 
+  await expect(page).toHaveURL(/sensitivityEnabled=true/);
   await expect(page).toHaveURL(/bodyFatUncertainty=5/);
   await expect(page).toHaveURL(/teeUncertainty=0.15/);
   await expect(page.getByRole("img", {
