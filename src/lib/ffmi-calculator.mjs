@@ -306,11 +306,19 @@ export const BODY_FAT_BANDS = {
   ],
 };
 
-const getBodyFatBand = (bodyFat, sex) =>
-  BODY_FAT_BANDS[sex].find((band) => bodyFat >= band.min && bodyFat < band.max) ??
-  (bodyFat < BODY_FAT_BANDS[sex][0].min
-    ? BODY_FAT_BANDS[sex][0]
-    : BODY_FAT_BANDS[sex].at(-1));
+const getBodyFatBand = (bodyFat, sex) => {
+  const bands = BODY_FAT_BANDS[sex];
+  const matchingBand = bands.find(
+    (band) => bodyFat >= band.min && bodyFat < band.max,
+  );
+  if (matchingBand) return matchingBand;
+
+  const edgeBand = bodyFat < (bands[0]?.min ?? 0) ? bands[0] : bands.at(-1);
+  if (!edgeBand) {
+    throw new Error(`No body-fat bands configured for ${sex}`);
+  }
+  return edgeBand;
+};
 
 export const calculateTotalEnergyExpenditure = (metrics) => {
   const normalized = normalizeMetrics(metrics);
@@ -475,8 +483,12 @@ export const calculateFatLossProjection = (metrics) => {
   const minimumDailyIntake = normalized.barbieriFast
     ? 0
     : MINIMUM_DAILY_INTAKE_KCAL;
-  const minimumTarget = BODY_FAT_BANDS[normalized.sex]
-    .find((band) => band.label === "Stage lean").min;
+  const stageLeanBand = BODY_FAT_BANDS[normalized.sex]
+    .find((band) => band.label === "Stage lean");
+  if (!stageLeanBand) {
+    throw new Error(`No Stage lean band configured for ${normalized.sex}`);
+  }
+  const minimumTarget = stageLeanBand.min;
   const targetBodyFats = BODY_FAT_BANDS[normalized.sex]
     .map((band) => band.min)
     .filter((bodyFat) =>

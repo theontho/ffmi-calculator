@@ -1,14 +1,12 @@
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { renderWeightInput, renderMetricHeight, renderImperialHeight, renderBodyFatInput, renderFFMIInput, renderCompositionLock, renderAgeInput, renderUnitSelect, renderSexSelect, renderProjectionYears, renderTrainingLevelInput, renderOptions, renderCurrentStats, renderFatLossProjection, renderBackgroundAndSources, ShareButton } from './ffmi-calculator-form-ui';
-import { renderLineChart, renderWeightLossChart } from './ffmi-calculator-chart-ui';
+import { renderWeightInput, renderMetricHeight, renderImperialHeight, renderBodyFatInput, renderFFMIInput, renderCompositionLock, renderAgeInput, renderUnitSelect, renderSexSelect, renderProjectionYears, renderTrainingLevelInput, renderOptions, renderCurrentStats, renderFatLossProjection, ShareButton } from './ffmi-calculator-form-ui';
+import { renderBackgroundAndSources } from './ffmi-background-sources';
 import {
     DEFAULT_METRICS,
-    FFMI_RANGE_LIMITS,
-    SEX,
     UNITS,
-    calculateLeanMassFromFFMI,
     calculateProjection,
     calculateBodyFatFromFFMI,
     calculateCurrentFFMI,
@@ -17,7 +15,6 @@ import {
     convertHeightToMetric,
     convertWeightToImperial,
     convertWeightToMetric,
-    getHeightInMeters,
     isFFMIValid,
     isMetricsValid,
     normalizeMetrics,
@@ -25,31 +22,15 @@ import {
     serializeMetrics,
 } from '@/lib/ffmi-calculator.mjs';
 
-// Original male formula: Monthly FFMI Increase = 0.3 × (25 − Current FFMI) ÷ 8 × (1.1 × e^(-0.0175 × (age - 18)))
-// Modified female formula: Monthly FFMI Increase = 0.18 × (20.5 − Current FFMI) ÷ 8 × (1.1 × e^(-0.0175 × (age - 18)))
-// Enhanced Male Monthly FFMI Increase = 0.54 × (28 − Current FFMI) ÷ 6 × (1.1 × e^(-0.0175 × (age - 18)))
-// Enhanced Female Monthly FFMI Increase = 0.324 × (23 − Current FFMI) ÷ 6 × (1.1 × e^(-0.0175 × (age - 18)))
-
-// TODO:
-// Month slider on bottom for easier mobile UX
-// Show ffmi category in tooltip (maybe with color edge highlight)
-
-
-
-const getLeanMassInKg = (leanMass, unit) =>
-    unit === UNITS.IMPERIAL ? convertWeightToMetric(leanMass) : leanMass;
-
-const getRelevantFFMILimits = (sex, enhanced) => {
-    return Object.values(FFMI_RANGE_LIMITS)
-        .filter(line => enhanced ||
-            (line !== FFMI_RANGE_LIMITS.ENHANCED_TERRITORY &&
-                line !== FFMI_RANGE_LIMITS.ENHANCED_ELITE))
-        .map(line => sex === SEX.MALE ? line.maleFFMI : line.femaleFFMI);
-};
-
-const calculateFFMIFromLeanMass = (leanMassKg, heightM) => {
-    return leanMassKg / (heightM * heightM);
-};
+const CalculatorCharts = dynamic(
+    () => import('./ffmi-calculator-charts'),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="h-96 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+        ),
+    },
+);
 
 const roundCompositionValue = (value) => Math.round(value * 100) / 100;
 const DEFAULT_FFMI = roundCompositionValue(calculateCurrentFFMI(DEFAULT_METRICS));
@@ -75,63 +56,10 @@ const useDebouncedValidValue = (value, delay, initialValue) => {
     return debouncedValue;
 };
 
-export const yAxisMin = (dataMin, metrics) => {
-    const numericDataMin = Number(dataMin);
-    const heightM = getHeightInMeters(metrics.height, metrics.unit);
-    const leanMassKg = getLeanMassInKg(numericDataMin, metrics.unit);
-    const currentFFMI = calculateFFMIFromLeanMass(leanMassKg, heightM);
-
-    // if (currentFFMI <= 13) {
-    //     return { leanMass: calculateLeanMassFromFFMI(currentFFMI, heightM, metrics.unit), ffmi: currentFFMI };
-    // }
-    // Get relevant FFMI limits based on sex and enhanced status
-    const relevantLimits = getRelevantFFMILimits(metrics.sex, metrics.enhanced);
-
-    const lowerLimits = relevantLimits.filter(ffmi => ffmi < currentFFMI);
-    const closestLowerFFMI = lowerLimits.length > 0
-        ? Math.max(...lowerLimits)
-        : currentFFMI - 1;
-
-    const resultLeanMass = calculateLeanMassFromFFMI(closestLowerFFMI, heightM, metrics.unit);
-    const outLean = Math.floor(Math.min(resultLeanMass, numericDataMin) - 0.2);
-    const outFFMI = calculateFFMIFromLeanMass(
-        getLeanMassInKg(outLean, metrics.unit),
-        heightM,
-    )
-
-    return { leanMass: outLean, ffmi: outFFMI };
-};
-
-export const yAxisMax = (dataMax, metrics) => {
-    const numericDataMax = Number(dataMax);
-    const heightM = getHeightInMeters(metrics.height, metrics.unit);
-    const leanMassKg = getLeanMassInKg(numericDataMax, metrics.unit);
-    const currentFFMI = calculateFFMIFromLeanMass(leanMassKg, heightM);
-
-    // if (currentFFMI >= getCurrentBaseParams(metrics).ceiling) {
-    //     return { leanMass: calculateLeanMassFromFFMI(currentFFMI, heightM, metrics.unit), ffmi: currentFFMI };
-    // }
-
-    // Get relevant FFMI limits based on sex and enhanced status
-    const relevantLimits = getRelevantFFMILimits(metrics.sex, metrics.enhanced);
-
-    const higherLimits = relevantLimits.filter(ffmi => ffmi > currentFFMI);
-    const closestHigherFFMI = higherLimits.length > 0
-        ? Math.min(...higherLimits)
-        : currentFFMI + 1;
-
-    const resultLeanMass = calculateLeanMassFromFFMI(closestHigherFFMI, heightM, metrics.unit);
-    const outLean = Math.ceil(Math.max(resultLeanMass, numericDataMax) + 4);
-    const outFFMI = calculateFFMIFromLeanMass(
-        getLeanMassInKg(outLean, metrics.unit),
-        heightM,
-    )
-
-    return { leanMass: outLean, ffmi: outFFMI };
-};
-
 const useIsMobile = () => {
-    const [isMobile, setIsMobile] = useState(null);
+    const [isMobile, setIsMobile] = useState(
+        /** @type {boolean | null} */ (null),
+    );
 
     useEffect(() => {
         const checkMobile = () => {
@@ -178,11 +106,13 @@ export function MuscleGainCalculator() {
         if (isMobile === null || isInitialized) return;
 
         const parsedMetrics = parseMetrics(window.location.search, isMobile);
+        /* eslint-disable react-hooks/set-state-in-effect -- URL initialization requires browser-only state after hydration. */
         setInputs({
             metrics: parsedMetrics,
             ffmi: roundCompositionValue(calculateCurrentFFMI(parsedMetrics)),
         });
         setIsInitialized(true);
+        /* eslint-enable react-hooks/set-state-in-effect */
     }, [isInitialized, isMobile]);
 
     useEffect(() => {
@@ -297,7 +227,11 @@ export function MuscleGainCalculator() {
     };
 
     return (
-        <Card className="w-full max-w-none mx-0 rounded-none sm:rounded-lg dark:bg-gray-900 dark:text-gray-100">
+        <Card
+            aria-busy={!isInitialized}
+            inert={!isInitialized ? true : undefined}
+            className="w-full max-w-none mx-0 rounded-none sm:rounded-lg dark:bg-gray-900 dark:text-gray-100"
+        >
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <CardTitle className="text-center sm:text-left" id="calculator-title">
@@ -305,18 +239,17 @@ export function MuscleGainCalculator() {
                     </CardTitle>
                     <ShareButton
                         metrics={validMetrics ?? projectedMetrics}
-                        disabled={!validMetrics}
+                        disabled={!isInitialized || !validMetrics}
                     />
                 </div>
             </CardHeader>
             <CardContent aria-labelledby="calculator-title">
-                <div className={validMetrics
-                    ? "grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6"
-                    : "grid grid-cols-1 gap-6"
-                }>
-                    {renderLineChart(chartData, projectedMetrics, Boolean(validMetrics))}
-                    {validMetrics && renderWeightLossChart(validMetrics)}
-                </div>
+                <fieldset disabled={!isInitialized} className="contents">
+                <CalculatorCharts
+                    chartData={chartData}
+                    projectedMetrics={projectedMetrics}
+                    validMetrics={validMetrics}
+                />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 mt-6">
                     <div className="space-y-4 md:col-span-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -356,6 +289,7 @@ export function MuscleGainCalculator() {
                 </div>
                 {validMetrics && renderFatLossProjection(validMetrics)}
                 {renderBackgroundAndSources()}
+                </fieldset>
             </CardContent>
         </Card>
     );

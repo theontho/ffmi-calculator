@@ -4,8 +4,13 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "sonner"
 
 export const metadata: Metadata = {
-  title: "Muscle Gain Calculator",
-  description: "Calculate your muscle growth gains",
+  metadataBase: new URL("https://theontho.github.io/ffmi-calculator/"),
+  title: {
+    default: "FFMI and Body Composition Calculator",
+    template: "%s | FFMI Calculator",
+  },
+  description:
+    "Estimate FFMI, project muscle gain, and compare dynamic fat-loss timelines.",
 };
 
 export default function RootLayout({

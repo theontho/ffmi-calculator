@@ -1,13 +1,26 @@
 "use client";
 import React from 'react';
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line, ReferenceArea, ReferenceLine } from 'recharts';
-import { yAxisMin, yAxisMax } from './ffmi-calculator';
+import { getLeanMassAxisMaximum, getLeanMassAxisMinimum } from '@/lib/chart-domains.mjs';
 import { UNITS, FFMI_RANGE_LIMITS, getHeightInMeters, SEX, calculateLeanMassFromFFMI, calculateWeightLossChart } from '@/lib/ffmi-calculator.mjs';
 
-const MuscleGainTooltip = ({ active, payload, label, unit }) => {
+/**
+ * @typedef {{ payload?: Record<string, string | number> }} ChartTooltipEntry
+ * @typedef {{ id: string, label: string, color: string }} FatLossSpeed
+ */
+
+/**
+ * @param {{
+ *   active?: boolean,
+ *   payload?: readonly ChartTooltipEntry[],
+ *   label?: string | number,
+ *   unit: string
+ * }} props
+ */
+const MuscleGainTooltip = ({ active = false, payload = [], label = '', unit }) => {
     const point = payload?.[0]?.payload;
     if (!active || !point) return null;
-    const ffmiGain = Number(point.ffmi) - Number(payload[0].payload.initialFFMI);
+    const ffmiGain = Number(point.ffmi) - Number(point.initialFFMI);
 
     return (
         <div className="rounded-md border border-gray-600 bg-gray-800 p-2 text-sm text-gray-100">
@@ -18,7 +31,16 @@ const MuscleGainTooltip = ({ active, payload, label, unit }) => {
     );
 };
 
-const WeightLossTooltip = ({ active, payload, label, unit, speeds }) => {
+/**
+ * @param {{
+ *   active?: boolean,
+ *   payload?: readonly ChartTooltipEntry[],
+ *   label?: string | number,
+ *   unit: string,
+ *   speeds: readonly FatLossSpeed[]
+ * }} props
+ */
+const WeightLossTooltip = ({ active = false, payload = [], label = '', unit, speeds }) => {
     const point = payload?.[0]?.payload;
     if (!active || !point) return null;
 
@@ -28,7 +50,7 @@ const WeightLossTooltip = ({ active, payload, label, unit, speeds }) => {
             {speeds.map((speed) => (
                 <p key={speed.id} style={{ color: speed.color }}>
                     {speed.label} max: {Number(point[speed.id]).toFixed(1)} {unit}
-                    {' · '}{Math.round(point[`${speed.id}Deficit`])} kcal/day
+                    {' · '}{Math.round(Number(point[`${speed.id}Deficit`]))} kcal/day
                 </p>
             ))}
         </div>
@@ -59,8 +81,8 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
         initialFFMI: ffmiData[0].ffmi,
     }));
     const leanMassDomain = [
-        yAxisMin(Math.min(...leanMassValues), metrics).leanMass,
-        yAxisMax(Math.max(...leanMassValues), metrics).leanMass,
+        getLeanMassAxisMinimum(Math.min(...leanMassValues), metrics).leanMass,
+        getLeanMassAxisMaximum(Math.max(...leanMassValues), metrics).leanMass,
     ];
     const heightM = getHeightInMeters(metrics.height, metrics.unit);
     const ffmiRanges = Object.values(FFMI_RANGE_LIMITS).filter((line) =>
@@ -128,18 +150,17 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                         offset: 10,
                         style: {
                             textAnchor: 'middle',
-                            dy: '50%'
                         }
                     }}
-                    padding={{ left: 10 }}
                     domain={leanMassDomain}
                     className="dark:text-gray-300" />
                 <Tooltip
-                    content={
+                    content={(tooltipProps) => (
                         <MuscleGainTooltip
+                            {...tooltipProps}
                             unit={metrics.unit === UNITS.METRIC ? 'kg' : 'lbs'}
                         />
-                    }
+                    )}
                 />
                 <Line
                     yAxisId="leanMass"
@@ -275,12 +296,13 @@ export const renderWeightLossChart = (metrics) => {
                             }}
                         />
                         <Tooltip
-                            content={
+                            content={(tooltipProps) => (
                                 <WeightLossTooltip
+                                    {...tooltipProps}
                                     unit={unit}
                                     speeds={projection.speeds}
                                 />
-                            }
+                            )}
                         />
                         {projection.bodyFatBands.map((band, index, bands) => {
                             const rangeStart = index === 0

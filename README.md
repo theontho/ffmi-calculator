@@ -1,6 +1,8 @@
 # FFMI Calculator
 
-A static [Next.js](https://nextjs.org) calculator for estimating current fat-free mass index (FFMI) and projecting lean-mass gains over time.
+A static [Next.js](https://nextjs.org) calculator for linked FFMI, weight, and
+body-fat estimates; muscle-gain projections; and dynamic fat-loss timelines
+with configurable expenditure and medically supervised fasting sensitivity.
 
 Use the calculator at [theontho.github.io/ffmi-calculator](https://theontho.github.io/ffmi-calculator/).
 
@@ -24,6 +26,8 @@ Body-fat regions use sex-specific, irregular fitness and aesthetic ranges synthe
 
 ## Getting Started
 
+Use Node.js 24, as specified in `.node-version`.
+
 Install the locked dependencies and run the development server:
 
 ```bash
@@ -40,6 +44,16 @@ npm test
 npm run lint
 npm run typecheck
 npm run build
+npm run test:pages
+npm run test:e2e
 ```
 
 `npm run build` writes the production static export to `out/`.
+
+Unit tests cover calculation and URL semantics. Playwright runs the interactive
+calculator suite in desktop and mobile Chromium. CI also validates that every
+GitHub Pages asset is emitted beneath the repository base path.
+
+## License
+
+[MIT](LICENSE)

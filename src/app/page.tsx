@@ -3,7 +3,7 @@ import { Metadata } from 'next'
 
 const SOCIAL_BLURBS = {
   title: 'FFMI and Body Composition Calculator',
-  description: 'Find out how much muscle you can gain monthly when you train right.',
+  description: 'Estimate FFMI, project muscle gain, and compare dynamic fat-loss timelines.',
 }
 
 export const metadata: Metadata = {
@@ -15,9 +15,10 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: SOCIAL_BLURBS.title,
     locale: 'en_US',
+    url: 'https://theontho.github.io/ffmi-calculator/',
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: SOCIAL_BLURBS.title,
     description: SOCIAL_BLURBS.description,
   },
