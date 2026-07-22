@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "sonner"
+import { PrivacyAnalytics } from "@/components/privacy-analytics"
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://theontho.github.io/ffmi-calculator/"),
@@ -29,6 +30,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          <PrivacyAnalytics />
         </ThemeProvider>
       </body>
     </html>

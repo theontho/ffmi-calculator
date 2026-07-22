@@ -61,6 +61,25 @@ body {
   }
 }
 
+@layer utilities {
+  /* Tailwind's 500 shades narrowly miss AA contrast on the gray calculator cards. */
+  .text-gray-500 {
+    color: var(--color-gray-600);
+  }
+
+  .text-blue-500 {
+    color: var(--color-blue-700);
+  }
+
+  .dark .text-gray-500 {
+    color: var(--color-gray-400);
+  }
+
+  .dark .text-blue-500 {
+    color: var(--color-blue-400);
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

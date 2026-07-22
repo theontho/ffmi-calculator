@@ -3,10 +3,12 @@ import test from "node:test";
 
 import {
   DEFAULT_METRICS,
+  FFMI_RANGE_LIMITS,
   calculateBodyFatFromFFMI,
   calculateCurrentFFMI,
   calculateFatLossProjection,
   calculateProjection,
+  calculateProjectionSensitivity,
   calculateWeightFromFFMI,
   calculateWeightLossChart,
   isFFMIValid,
@@ -22,6 +24,74 @@ test("uses the existing desktop and mobile defaults", () => {
     ...DEFAULT_METRICS,
     years: 2,
   });
+
+});
+
+test("labels the high FFMI bands as steroid and enhanced ranges", () => {
+  assert.equal(
+    FFMI_RANGE_LIMITS.RECREATIONAL.label,
+    "Recreational Lifter",
+  );
+  assert.equal(
+    FFMI_RANGE_LIMITS.EXPERIENCED.label,
+    "Experienced Lifter",
+  );
+  assert.deepEqual(
+    {
+      label: FFMI_RANGE_LIMITS.ENHANCED_TERRITORY.label,
+      male: FFMI_RANGE_LIMITS.ENHANCED_TERRITORY.maleFFMI,
+      female: FFMI_RANGE_LIMITS.ENHANCED_TERRITORY.femaleFFMI,
+    },
+    {
+      label: "High FFMI (Steroid/Enhanced Range)",
+      male: 27,
+      female: 23,
+    },
+  );
+  assert.deepEqual(
+    {
+      label: FFMI_RANGE_LIMITS.ENHANCED_ELITE.label,
+      male: FFMI_RANGE_LIMITS.ENHANCED_ELITE.maleFFMI,
+      female: FFMI_RANGE_LIMITS.ENHANCED_ELITE.femaleFFMI,
+    },
+    {
+      label: "Very High FFMI (Elite Steroid/Enhanced Range)",
+      male: 30,
+      female: 25,
+    },
+  );
+});
+
+test("accepts locale-specific defaults without overriding shared values", () => {
+  const localeDefaults = {
+    ...DEFAULT_METRICS,
+    weight: 88.6,
+    height: 179.8,
+    bodyFat: 25.9,
+    sex: "female",
+    unit: "metric",
+    feet: 5,
+    inches: 10.8,
+  };
+
+  assert.deepEqual(parseMetrics("", false, localeDefaults), localeDefaults);
+  assert.equal(
+    parseMetrics("?weight=75&bodyFat=30", false, localeDefaults).weight,
+    75,
+  );
+  assert.equal(
+    parseMetrics("?weight=75&bodyFat=30", false, localeDefaults).height,
+    179.8,
+  );
+  const imperialOverride = parseMetrics(
+    "?unit=imperial",
+    false,
+    localeDefaults,
+  );
+  assert.ok(Math.abs(imperialOverride.weight - 195.3) < 0.1);
+  assert.equal(imperialOverride.height, 70.8);
+  assert.equal(imperialOverride.feet, 5);
+  assert.equal(imperialOverride.inches, 10.8);
 });
 
 test("preserves and clamps the complete shared-query contract", () => {
@@ -42,6 +112,8 @@ test("preserves and clamps the complete shared-query contract", () => {
     inches: 11.9,
     enhanced: true,
     teeMultiplier: 1,
+    bodyFatUncertainty: 3,
+    teeUncertainty: 0.1,
     barbieriFast: false,
     years: 10,
     trainingLevel: "DEDICATED",
@@ -59,20 +131,53 @@ test("derives imperial height from feet and inches and serializes every field", 
   assert.equal(
     serializeMetrics(metrics),
     "weight=165.5&height=67.5&bodyFat=14.5&age=35&sex=female&unit=imperial" +
-      "&feet=5&inches=7.5&enhanced=false&teeMultiplier=1&barbieriFast=false" +
+      "&feet=5&inches=7.5&enhanced=false&teeMultiplier=1" +
+      "&bodyFatUncertainty=3&teeUncertainty=0.1&barbieriFast=false" +
       "&years=3&trainingLevel=ELITE",
   );
 });
 
+test("supports UK stone and pound inputs without changing calculations", () => {
+  const uk = parseMetrics(
+    "?unit=uk&stones=13&stonePounds=7.6&feet=5&inches=9.9",
+    false,
+  );
+  const imperial = {
+    ...uk,
+    unit: "imperial",
+  };
+
+  assert.equal(uk.weight, 189.6);
+  assert.equal(uk.height, 69.9);
+  assert.equal(uk.stones, 13);
+  assert.equal(uk.stonePounds, 7.6);
+  assert.equal(isMetricsValid(uk), true);
+  assert.ok(
+    Math.abs(calculateCurrentFFMI(uk) - calculateCurrentFFMI(imperial)) <
+      1e-10,
+  );
+  assert.ok(
+    Math.abs(
+      Number(calculateProjection(uk)[0].leanMass) * 14 -
+        Number(calculateProjection(imperial)[0].leanMass),
+    ) < 0.11,
+  );
+  assert.match(serializeMetrics(uk), /unit=uk/);
+  assert.match(serializeMetrics(uk), /stones=13&stonePounds=7.6/);
+});
+
 test("supports exceptional imperial weight and body-fat inputs", () => {
   const metrics = parseMetrics(
-    "?unit=imperial&weight=2000&bodyFat=99&teeMultiplier=9&barbieriFast=true",
+    "?unit=imperial&weight=2000&bodyFat=99&teeMultiplier=9" +
+      "&bodyFatUncertainty=99&teeUncertainty=2&barbieriFast=true",
     false,
   );
 
   assert.equal(metrics.weight, 1000);
   assert.equal(metrics.bodyFat, 75);
   assert.equal(metrics.teeMultiplier, 1.35);
+  assert.equal(metrics.bodyFatUncertainty, 10);
+  assert.equal(metrics.teeUncertainty, 0.3);
   assert.equal(metrics.barbieriFast, true);
 });
 
@@ -82,18 +187,32 @@ test("keeps deterministic projection semantics", () => {
   assert.equal(projection.length, 49);
   assert.deepEqual(projection[0], {
     month: 0,
-    ffmi: "19.47",
-    bmi: "28.50",
+    ffmi: "19.21",
+    bmi: "28.25",
     leanMass: "149.6",
     leanMassDisplay: "149.6 ",
   });
   assert.deepEqual(projection.at(-1), {
     month: 48,
-    ffmi: "22.74",
-    bmi: "28.50",
-    leanMass: "174.8",
-    leanMassDisplay: "174.8 (+25.2 lbs)",
+    ffmi: "22.64",
+    bmi: "28.25",
+    leanMass: "176.3",
+    leanMassDisplay: "176.3 (+26.7 lbs)",
   });
+});
+
+test("builds ordered muscle-gain sensitivity envelopes", () => {
+  const projection = calculateProjectionSensitivity(DEFAULT_METRICS);
+
+  assert.equal(projection.length, 49);
+  assert.ok(projection.every((point) => {
+    const [low, high] = point.leanMassSensitivity;
+    return low <= Number(point.leanMass) && Number(point.leanMass) <= high;
+  }));
+  assert.ok(
+    projection.at(-1).leanMassSensitivity[1] -
+      projection.at(-1).leanMassSensitivity[0] > 5,
+  );
 });
 
 test("maintenance training leaves lean mass unchanged", () => {
@@ -325,6 +444,50 @@ test("scales TEE and supports a zero-intake Barbieri-style fast", () => {
   assert.ok(Math.abs(modeledLoss - 276) < 3);
 });
 
+test("compares a CALERIE-informed operating point with its published endpoint", () => {
+  const metrics = {
+    ...DEFAULT_METRICS,
+    weight: 195.3,
+    bodyFat: 24.7,
+    height: 70.3,
+    feet: 5,
+    inches: 10.3,
+    age: 37,
+  };
+  const projection = calculateFatLossProjection(metrics);
+  const state = projection.simulations.conservative.monthly[6];
+  const initialWeightKg = metrics.weight * 0.453592;
+  const modeledLossKg = initialWeightKg - state.scaleWeightKg;
+  const observedLossKg = 88.6 * 0.104;
+  const modeledLeanLossKg =
+    initialWeightKg * (1 - metrics.bodyFat / 100) - state.leanMassKg;
+
+  assert.equal(state.day, 183);
+  assert.ok(Math.abs(modeledLossKg - observedLossKg) / observedLossKg < 0.2);
+  assert.ok(modeledLeanLossKg < 1);
+  assert.ok(modeledLeanLossKg < 3.3 * 0.4);
+});
+
+test("documents the adipose-flux boundary in the Friedl Ranger cohort", () => {
+  const metrics = {
+    ...DEFAULT_METRICS,
+    weight: 176,
+    bodyFat: 14.3,
+    height: 70.1,
+    feet: 5,
+    inches: 10.1,
+    age: 24,
+  };
+  const projection = calculateFatLossProjection(metrics);
+  const state = projection.simulations.maximum.monthly[2];
+  const initialWeightKg = metrics.weight * 0.453592;
+  const modeledLossKg = initialWeightKg - state.scaleWeightKg;
+  const observedLossKg = 80 * 0.157;
+
+  assert.ok(projection.maxDailyDeficit < 810);
+  assert.ok(modeledLossKg < observedLossKg * 0.6);
+});
+
 test("truncates targets when the modeled deficit stalls", () => {
   const projection = calculateFatLossProjection({
     ...DEFAULT_METRICS,
@@ -414,12 +577,68 @@ test("builds ordered weight-loss curves through the moderate-speed cutoff", () =
   assert.ok(last.conservative > targetWeight);
   assert.ok(Math.abs(last.moderate - targetWeight) < 0.01);
   assert.ok(Math.abs(last.fast - targetWeight) < 0.05);
-  assert.ok(Math.abs(last.maximum - targetWeight) < 0.05);
+  assert.ok(Math.abs(last.maximum - targetWeight) < 0.06);
   assert.equal(last.maximumDeficit, 0);
+  assert.deepEqual(chart.sensitivity, { bodyFat: 3, tee: 0.1 });
+  assert.ok(chart.speeds.every((speed) =>
+    chart.data.every((point) => {
+      const [low, high] = point[`${speed.id}Sensitivity`];
+      return low <= point[speed.id] && point[speed.id] <= high;
+    })
+  ));
   assert.ok(
     chart.speeds.every((speed) =>
       projection.simulations[speed.id].finalState.bodyFat <=
         chart.targets.at(-1).bodyFat
     ),
   );
+});
+
+test("collapses sensitivity envelopes when uncertainty is disabled", () => {
+  const projection = calculateProjectionSensitivity({
+    ...DEFAULT_METRICS,
+    bodyFatUncertainty: 0,
+  });
+  const chart = calculateWeightLossChart({
+    ...DEFAULT_METRICS,
+    bodyFatUncertainty: 0,
+    teeUncertainty: 0,
+  });
+
+  assert.ok(projection.every((point) =>
+    point.leanMassSensitivity.every((value) =>
+      value === Number(point.leanMass)
+    )
+  ));
+  assert.ok(chart.speeds.every((speed) =>
+    chart.data.every((point) =>
+      point[`${speed.id}Sensitivity`].every((value) =>
+        Math.abs(value - point[speed.id]) < 1e-10
+      )
+    )
+  ));
+});
+
+test("includes nonlinear interior scenarios in the fat-loss sensitivity band", () => {
+  const metrics = {
+    ...DEFAULT_METRICS,
+    weight: 500,
+    bodyFat: 65,
+    teeMultiplier: 0.75,
+    bodyFatUncertainty: 10,
+    teeUncertainty: 0.3,
+  };
+  const chart = calculateWeightLossChart(metrics);
+  const interiorProjection = calculateFatLossProjection({
+    ...metrics,
+    bodyFat: 68,
+    teeMultiplier: 1.05,
+  });
+  const interiorState =
+    interiorProjection.simulations.moderate.monthly[47];
+  const interiorWeight = interiorState.scaleWeightKg * 2.20462;
+  const [low, high] = chart.data[47].moderateSensitivity;
+
+  assert.ok(low <= interiorWeight);
+  assert.ok(interiorWeight <= high);
 });

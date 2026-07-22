@@ -9,6 +9,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: "http://127.0.0.1:3000/ffmi-calculator/",
+    locale: "en-US",
     trace: "retain-on-failure",
   },
   webServer: {

@@ -1,11 +1,14 @@
 "use client";
 import React from 'react';
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line, ReferenceArea, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Line, Area, ReferenceArea, ReferenceLine } from 'recharts';
 import { getLeanMassAxisMaximum, getLeanMassAxisMinimum } from '@/lib/chart-domains.mjs';
 import { UNITS, FFMI_RANGE_LIMITS, getHeightInMeters, SEX, calculateLeanMassFromFFMI, calculateWeightLossChart } from '@/lib/ffmi-calculator.mjs';
 
+const getWeightUnit = (unit) =>
+    unit === UNITS.METRIC ? 'kg' : unit === UNITS.UK ? 'st' : 'lbs';
+
 /**
- * @typedef {{ payload?: Record<string, string | number> }} ChartTooltipEntry
+ * @typedef {{ payload?: Record<string, string | number | number[]> }} ChartTooltipEntry
  * @typedef {{ id: string, label: string, color: string }} FatLossSpeed
  */
 
@@ -21,12 +24,20 @@ const MuscleGainTooltip = ({ active = false, payload = [], label = '', unit }) =
     const point = payload?.[0]?.payload;
     if (!active || !point) return null;
     const ffmiGain = Number(point.ffmi) - Number(point.initialFFMI);
+    const sensitivity = Array.isArray(point.leanMassSensitivity)
+        ? point.leanMassSensitivity
+        : [];
 
     return (
         <div className="rounded-md border border-gray-600 bg-gray-800 p-2 text-sm text-gray-100">
             <p className="font-medium">Month {label}</p>
             <p>Lean Mass ({unit}): {point.leanMassDisplay ?? point.leanMass}</p>
             <p>FFMI: {point.ffmi} ({ffmiGain >= 0 ? '+' : ''}{ffmiGain.toFixed(2)} points)</p>
+            {sensitivity.length === 2 && (
+                <p className="text-gray-300">
+                    Sensitivity: {Number(sensitivity[0]).toFixed(1)}–{Number(sensitivity[1]).toFixed(1)} {unit}
+                </p>
+            )}
         </div>
     );
 };
@@ -47,12 +58,22 @@ const WeightLossTooltip = ({ active = false, payload = [], label = '', unit, spe
     return (
         <div className="rounded-md border border-gray-600 bg-gray-800 p-2 text-sm text-gray-100">
             <p className="font-medium">Month {label}</p>
-            {speeds.map((speed) => (
-                <p key={speed.id} style={{ color: speed.color }}>
-                    {speed.label} max: {Number(point[speed.id]).toFixed(1)} {unit}
-                    {' · '}{Math.round(Number(point[`${speed.id}Deficit`]))} kcal/day
-                </p>
-            ))}
+            {speeds.map((speed) => {
+                const sensitivity = point[`${speed.id}Sensitivity`];
+                return (
+                    <div key={speed.id}>
+                        <p style={{ color: speed.color }}>
+                            {speed.label} max: {Number(point[speed.id]).toFixed(1)} {unit}
+                            {' · '}{Math.round(Number(point[`${speed.id}Deficit`]))} kcal/day
+                        </p>
+                        {Array.isArray(sensitivity) && sensitivity.length === 2 && (
+                            <p className="text-xs text-gray-300">
+                                Sensitivity: {Number(sensitivity[0]).toFixed(1)}–{Number(sensitivity[1]).toFixed(1)} {unit}
+                            </p>
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 };
@@ -74,7 +95,12 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
     }
 
     const leanMassValues = ffmiData
-        .map((point) => Number(point.leanMass))
+        .flatMap((point) => [
+            Number(point.leanMass),
+            ...(Array.isArray(point.leanMassSensitivity)
+                ? point.leanMassSensitivity.map(Number)
+                : []),
+        ])
         .filter(Number.isFinite);
     const tooltipData = ffmiData.map((point) => ({
         ...point,
@@ -97,21 +123,34 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                 <h3 className="font-bold text-base" id="muscle-gain-chart-title">
                     Muscle gain graph
                 </h3>
-                <span className="inline-flex items-center gap-1 text-xs">
+                <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs">
                     <span
-                        className="inline-block h-0.5 w-3 bg-emerald-600"
-                        aria-hidden="true"
-                    />
-                    Lean Mass
+                        className="inline-flex items-center gap-1"
+                    >
+                        <span
+                            className="inline-block h-0.5 w-3 bg-emerald-600"
+                            aria-hidden="true"
+                        />
+                        Lean mass
+                    </span>
+                    <span
+                        className="inline-flex items-center gap-1"
+                    >
+                        <span
+                            className="inline-block h-2 w-3 bg-emerald-600/20"
+                            aria-hidden="true"
+                        />
+                        Sensitivity
+                    </span>
                 </span>
             </div>
             <div
                 className="mt-1 min-h-0 flex-1"
                 role="img"
-                aria-label={`Projected lean mass over ${metrics.years} years`}
+                aria-label={`Projected lean mass over ${metrics.years} years with a sensitivity envelope for plus or minus ${metrics.bodyFatUncertainty} body-fat percentage points`}
             >
             <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <ComposedChart
                 data={tooltipData}
                 margin={{
                     top: 15,
@@ -144,7 +183,7 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                     yAxisId="leanMass"
                     orientation="left"
                     label={{
-                        value: `Lean Mass (${metrics.unit === UNITS.METRIC ? 'kg' : 'lbs'})`,
+                        value: `Lean Mass (${getWeightUnit(metrics.unit)})`,
                         angle: -90,
                         position: 'insideLeft',
                         offset: 10,
@@ -158,9 +197,19 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                     content={(tooltipProps) => (
                         <MuscleGainTooltip
                             {...tooltipProps}
-                            unit={metrics.unit === UNITS.METRIC ? 'kg' : 'lbs'}
+                            unit={getWeightUnit(metrics.unit)}
                         />
                     )}
+                />
+                <Area
+                    yAxisId="leanMass"
+                    type="monotone"
+                    dataKey="leanMassSensitivity"
+                    stroke="none"
+                    fill="#059669"
+                    fillOpacity={0.28}
+                    isAnimationActive={false}
+                    name="Sensitivity envelope"
                 />
                 <Line
                     yAxisId="leanMass"
@@ -168,7 +217,7 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                     dataKey="leanMass"
                     stroke="#059669"
                     strokeWidth={2}
-                    name={`Lean Mass (${metrics.unit === UNITS.METRIC ? 'kg' : 'lbs'})`}
+                    name={`Lean Mass (${getWeightUnit(metrics.unit)})`}
                     isAnimationActive={false} />
                 {ffmiRanges.map((line, index, ranges) => {
                     const ffmiValue = metrics.sex === SEX.MALE ? line.maleFFMI : line.femaleFFMI;
@@ -224,7 +273,7 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                         }} />
                 ))}
 
-            </LineChart>
+            </ComposedChart>
             </ResponsiveContainer>
             </div>
         </section>
@@ -235,9 +284,17 @@ export const renderWeightLossChart = (metrics) => {
     const projection = calculateWeightLossChart(metrics);
     if (projection.data.length === 0) return null;
 
-    const unit = metrics.unit === UNITS.METRIC ? 'kg' : 'lbs';
+    const unit = getWeightUnit(metrics.unit);
     const projectedWeights = projection.data.flatMap((point) =>
-        projection.speeds.map((speed) => Number(point[speed.id]))
+        projection.speeds.flatMap((speed) => {
+            const sensitivity = point[`${speed.id}Sensitivity`];
+            return [
+                Number(point[speed.id]),
+                ...(Array.isArray(sensitivity)
+                    ? sensitivity.map(Number)
+                    : []),
+            ];
+        })
     );
     const weightDomain = [
         Math.floor(Math.min(
@@ -269,15 +326,22 @@ export const renderWeightLossChart = (metrics) => {
                             {speed.label} max
                         </span>
                     ))}
+                    <span className="inline-flex items-center gap-1">
+                        <span
+                            className="inline-block h-2 w-3 bg-blue-600/20"
+                            aria-hidden="true"
+                        />
+                        Matching shading: sensitivity
+                    </span>
                 </div>
             </div>
             <div
                 className="mt-1 min-h-0 flex-1"
                 role="img"
-                aria-label={`Projected weight in ${unit} at four dynamic fat-loss speeds`}
+                aria-label={`Projected weight in ${unit} at four dynamic fat-loss speeds, each with a sensitivity envelope using plus or minus ${projection.sensitivity.bodyFat} body-fat percentage points and ${projection.sensitivity.tee} TEE multiplier`}
             >
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
+                    <ComposedChart
                         data={projection.data}
                         margin={{ top: 15, right: 25, left: 5, bottom: 25 }}
                     >
@@ -348,6 +412,19 @@ export const renderWeightLossChart = (metrics) => {
                             />
                         ))}
                         {projection.speeds.map((speed) => (
+                            <Area
+                                key={`${speed.id}-sensitivity`}
+                                yAxisId="weight"
+                                type="monotone"
+                                dataKey={`${speed.id}Sensitivity`}
+                                stroke="none"
+                                fill={speed.color}
+                                fillOpacity={0.16}
+                                isAnimationActive={false}
+                                name={`${speed.label} sensitivity envelope`}
+                            />
+                        ))}
+                        {projection.speeds.map((speed) => (
                             <Line
                                 key={speed.id}
                                 yAxisId="weight"
@@ -360,7 +437,7 @@ export const renderWeightLossChart = (metrics) => {
                                 isAnimationActive={false}
                             />
                         ))}
-                    </LineChart>
+                    </ComposedChart>
                 </ResponsiveContainer>
             </div>
         </section>

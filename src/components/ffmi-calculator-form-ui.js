@@ -1,20 +1,64 @@
 "use client";
 import React from 'react';
-import { BODY_FAT_RANGE, FFMI_RANGE_LIMITS, SEX, TEE_MULTIPLIER_RANGE, UNITS, WEIGHT_RANGES, TRAINING_LEVELS, calculateFatLossProjection } from '@/lib/ffmi-calculator.mjs';
+import { BODY_FAT_RANGE, BODY_FAT_UNCERTAINTY_RANGE, FFMI_RANGE_LIMITS, SEX, TEE_MULTIPLIER_RANGE, TEE_UNCERTAINTY_RANGE, UNITS, WEIGHT_RANGES, TRAINING_LEVELS, calculateFatLossProjection, serializeMetrics } from '@/lib/ffmi-calculator.mjs';
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 
-// Update the range input class to include a light mode background
 const rangeInputClass = "w-full h-11 sm:h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-700 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 sm:[&::-webkit-slider-thumb]:w-4 sm:[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 sm:[&::-moz-range-thumb]:w-4 sm:[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-blue-500 [&::-moz-range-thumb]:border-0";
-export const renderWeightInput = (metrics, handleInputChange, disabled = false) => (
-    <div>
+const getWeightUnit = (unit) =>
+    unit === UNITS.METRIC ? 'kg' : unit === UNITS.UK ? 'st' : 'lbs';
+
+export const renderWeightInput = (metrics, handleInputChange, disabled = false) => {
+    if (metrics.unit === UNITS.UK) {
+        return (
+            <div>
+                <span className="block text-sm font-medium mb-1 dark:text-gray-100">
+                    Weight (st &amp; lb)
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                    <input
+                        type="number"
+                        id="weight-stones-input"
+                        aria-label="Weight in stones"
+                        name="stones"
+                        value={metrics.stones}
+                        onChange={handleInputChange}
+                        disabled={disabled}
+                        inputMode="numeric"
+                        min="4"
+                        max="71"
+                        step="1"
+                        className="w-full p-2 border rounded disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                    />
+                    <input
+                        type="number"
+                        id="weight-pounds-input"
+                        aria-label="Additional weight in pounds"
+                        name="stonePounds"
+                        value={metrics.stonePounds}
+                        onChange={handleInputChange}
+                        disabled={disabled}
+                        inputMode="decimal"
+                        min="0"
+                        max="13.9"
+                        step="0.1"
+                        className="w-full p-2 border rounded disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div>
         <label htmlFor="weight-input" className="block text-sm font-medium mb-1 dark:text-gray-100">
-            Weight ({metrics.unit === UNITS.METRIC ? 'kg' : 'lbs'})
+            Weight ({getWeightUnit(metrics.unit)})
         </label>
         <div className="flex gap-4 items-center">
             <input
                 type="range"
                 id="weight-slider"
+                aria-label="Weight slider"
                 name="weight"
                 value={metrics.weight}
                 onChange={handleInputChange}
@@ -36,8 +80,9 @@ export const renderWeightInput = (metrics, handleInputChange, disabled = false) 
                 step="0.1"
                 className="w-24 p-2 border rounded disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100" />
         </div>
-    </div>
-);
+        </div>
+    );
+};
 export const renderMetricHeight = (metrics, handleInputChange) => (
     <div>
         <label htmlFor="height-input" className="block text-sm font-medium mb-1 dark:text-gray-100">
@@ -47,6 +92,7 @@ export const renderMetricHeight = (metrics, handleInputChange) => (
             <input
                 type="range"
                 id="height-slider"
+                aria-label="Height slider"
                 name="height"
                 value={metrics.height}
                 onChange={handleInputChange}
@@ -76,7 +122,6 @@ export const renderImperialHeight = (metrics, handleInputChange) => (
         <div className="grid grid-cols-2 gap-2">
             <input
                 type="number"
-                aria-labelledby="imperial-height-label"
                 aria-label="Height in feet"
                 name="feet"
                 value={metrics.feet}
@@ -89,7 +134,6 @@ export const renderImperialHeight = (metrics, handleInputChange) => (
                 className="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100" />
             <input
                 type="number"
-                aria-labelledby="imperial-height-label"
                 aria-label="Height in inches"
                 name="inches"
                 value={metrics.inches}
@@ -112,6 +156,7 @@ export const renderBodyFatInput = (metrics, handleInputChange, disabled = false)
             <input
                 type="range"
                 id="body-fat-slider"
+                aria-label="Body fat slider"
                 name="bodyFat"
                 value={metrics.bodyFat}
                 onChange={handleInputChange}
@@ -144,6 +189,7 @@ export const renderFFMIInput = (ffmi, handleInputChange, disabled = false) => (
             <input
                 type="range"
                 id="ffmi-slider"
+                aria-label="FFMI slider"
                 name="ffmi"
                 value={ffmi}
                 onChange={handleInputChange}
@@ -206,6 +252,7 @@ export const renderAgeInput = (metrics, handleInputChange) => (
             <input
                 type="range"
                 id="age-slider"
+                aria-label="Age slider"
                 name="age"
                 value={metrics.age}
                 onChange={handleInputChange}
@@ -239,7 +286,8 @@ export const renderUnitSelect = (metrics, handleInputChange) => (
             className="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
         >
             <option value={UNITS.METRIC}>Metric (kg/cm)</option>
-            <option value={UNITS.IMPERIAL}>Imperial (lbs/inches)</option>
+            <option value={UNITS.IMPERIAL}>Pounds + feet/inches</option>
+            <option value={UNITS.UK}>UK mixed (stone/lb + feet/inches)</option>
         </select>
     </div>
 );
@@ -269,6 +317,7 @@ export const renderProjectionYears = (metrics, handleInputChange) => (
             <input
                 type="range"
                 id="projection-years-slider"
+                aria-label="Projection years slider"
                 name="years"
                 value={metrics.years}
                 onChange={handleInputChange}
@@ -314,12 +363,18 @@ export const renderTrainingLevelInput = (metrics, handleInputChange) => (
     </div>
 );
 export const renderOptions = (metrics, setMetrics) => {
-    const updateTeeMultiplier = (event) => {
+    const updateMetric = (event) => {
+        const { name, value } = event.target;
         setMetrics(prev => ({
             ...prev,
-            teeMultiplier: event.target.value,
+            [name]: value,
         }));
     };
+    const uncertaintyPresets = [
+        { label: 'Measured', bodyFat: 3, tee: 0.1 },
+        { label: 'Consumer', bodyFat: 5, tee: 0.15 },
+        { label: 'Broad / visual', bodyFat: 7, tee: 0.2 },
+    ];
 
     return (
         <div className="space-y-3">
@@ -350,9 +405,10 @@ export const renderOptions = (metrics, setMetrics) => {
                         <input
                             type="range"
                             id="tee-multiplier-slider"
+                            aria-label="TEE multiplier slider"
                             name="teeMultiplier"
                             value={metrics.teeMultiplier}
-                            onChange={updateTeeMultiplier}
+                            onChange={updateMetric}
                             min={TEE_MULTIPLIER_RANGE.min}
                             max={TEE_MULTIPLIER_RANGE.max}
                             step="0.01"
@@ -363,7 +419,7 @@ export const renderOptions = (metrics, setMetrics) => {
                             id="tee-multiplier-input"
                             name="teeMultiplier"
                             value={metrics.teeMultiplier}
-                            onChange={updateTeeMultiplier}
+                            onChange={updateMetric}
                             inputMode="decimal"
                             min={TEE_MULTIPLIER_RANGE.min}
                             max={TEE_MULTIPLIER_RANGE.max}
@@ -374,6 +430,72 @@ export const renderOptions = (metrics, setMetrics) => {
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Scales average TEE for individual metabolism and activity. Use 1.00x unless you have expenditure data or want a sensitivity range.
                     </p>
+                    <div className="mt-5 border-t pt-4 dark:border-gray-700">
+                        <p className="text-sm font-medium">Projection sensitivity</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Choose how uncertain the body-fat and TEE inputs may be. Graph bands show the resulting what-if range, not a confidence interval.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2" aria-label="Sensitivity presets">
+                            {uncertaintyPresets.map((preset) => {
+                                const active =
+                                    Number(metrics.bodyFatUncertainty) === preset.bodyFat &&
+                                    Number(metrics.teeUncertainty) === preset.tee;
+                                return (
+                                    <button
+                                        key={preset.label}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => setMetrics(prev => ({
+                                            ...prev,
+                                            bodyFatUncertainty: preset.bodyFat,
+                                            teeUncertainty: preset.tee,
+                                        }))}
+                                        className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                            active
+                                                ? 'border-blue-600 bg-blue-600 text-white'
+                                                : 'border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800'
+                                        }`}
+                                    >
+                                        {preset.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label htmlFor="body-fat-uncertainty" className="block text-xs font-medium">
+                                    Body-fat uncertainty (± percentage points)
+                                </label>
+                                <input
+                                    id="body-fat-uncertainty"
+                                    name="bodyFatUncertainty"
+                                    type="number"
+                                    value={metrics.bodyFatUncertainty}
+                                    onChange={updateMetric}
+                                    min={BODY_FAT_UNCERTAINTY_RANGE.min}
+                                    max={BODY_FAT_UNCERTAINTY_RANGE.max}
+                                    step="0.5"
+                                    className="mt-1 w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="tee-uncertainty" className="block text-xs font-medium">
+                                    TEE uncertainty (± multiplier)
+                                </label>
+                                <input
+                                    id="tee-uncertainty"
+                                    name="teeUncertainty"
+                                    type="number"
+                                    value={metrics.teeUncertainty}
+                                    onChange={updateMetric}
+                                    min={TEE_UNCERTAINTY_RANGE.min}
+                                    max={TEE_UNCERTAINTY_RANGE.max}
+                                    step="0.01"
+                                    className="mt-1 w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                                />
+                            </div>
+                        </div>
+                    </div>
                     <label className="mt-4 flex items-start gap-2 cursor-pointer">
                         <input
                             id="barbieri-fast"
@@ -400,8 +522,13 @@ export const renderOptions = (metrics, setMetrics) => {
         </div>
     );
 };
-const getFFMICategory = (ffmi, sex) =>
+const getFFMICategory = (ffmi, sex, enhanced) =>
     Object.values(FFMI_RANGE_LIMITS)
+        .filter((range) =>
+            enhanced ||
+            (range !== FFMI_RANGE_LIMITS.ENHANCED_TERRITORY &&
+                range !== FFMI_RANGE_LIMITS.ENHANCED_ELITE)
+        )
         .find((range) => ffmi >= (sex === SEX.MALE ? range.maleFFMI : range.femaleFFMI))
         ?.label ?? 'Below Average';
 
@@ -419,9 +546,22 @@ const CurrentStats = ({ ffmiData, metrics, onReset }) => {
     const minimumIntakeToStayWithinAdiposeFlux = Math.ceil(
         fatLossProjection.model.minimumIntakeToStayWithinAdiposeFlux,
     );
-    const fatMassInMatchingUnit = Math.round((metrics.unit === UNITS.METRIC ? fatMassKg : (fatMassKg * 2.2)) * 100) / 100;
+    const fatMassInMatchingUnit = Math.round((
+        metrics.unit === UNITS.METRIC
+            ? fatMassKg
+            : metrics.unit === UNITS.UK
+                ? fatMassKg * 2.20462 / 14
+                : fatMassKg * 2.20462
+    ) * 100) / 100;
     const leanMassInMatchingUnit = Math.round(ffmiData[0]?.leanMass * 100) / 100;
-    const unit = metrics.unit === UNITS.METRIC ? 'kg' : 'lbs';
+    const unit = getWeightUnit(metrics.unit);
+    const linkedUnit = metrics.unit === UNITS.METRIC ? 'kg' : 'lbs';
+    const linkedFatMass = metrics.unit === UNITS.UK
+        ? fatMassInMatchingUnit * 14
+        : fatMassInMatchingUnit;
+    const linkedLeanMass = metrics.unit === UNITS.UK
+        ? leanMassInMatchingUnit * 14
+        : leanMassInMatchingUnit;
     const sex = metrics.sex === 'male' ? 'm' : 'f';
     const initialLeanMass = Number(ffmiData[0]?.leanMass);
     const milestones = [6, 12, 24]
@@ -437,7 +577,11 @@ const CurrentStats = ({ ffmiData, metrics, onReset }) => {
             <p>Lean Mass: {leanMassInMatchingUnit} {unit}</p>
             <p>Fat Mass: {fatMassInMatchingUnit} {unit}</p>
             <p>FFMI (Fat Free Mass Index): {ffmiData[0]?.ffmi}</p>
-            <p>FFMI range: {getFFMICategory(Number(ffmiData[0]?.ffmi), metrics.sex)}</p>
+            <p>FFMI range: {getFFMICategory(
+                Number(ffmiData[0]?.ffmi),
+                metrics.sex,
+                metrics.enhanced,
+            )}</p>
             <p>BMI (Body Mass Index): {ffmiData[0]?.bmi}</p>
             {milestones.length > 0 && (
                 <div className="mt-3 border-t pt-3 dark:border-gray-700">
@@ -454,13 +598,13 @@ const CurrentStats = ({ ffmiData, metrics, onReset }) => {
                     </p>
                 </div>
                 <div>
-                    <p><a href={`https://app.exfatloss.com/adipose?unit=${unit}&fm=${fatMassInMatchingUnit}&la=18`} className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener">Adipose-flux ceiling</a>: {adiposeFlux} kcal/day</p>
+                    <p><a href={`https://app.exfatloss.com/adipose?unit=${linkedUnit}&fm=${linkedFatMass}&la=18`} className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener">Adipose-flux ceiling</a>: {adiposeFlux} kcal/day</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                         The theoretical maximum energy current fat stores can release per day.
                     </p>
                 </div>
                 <div>
-                    <p><a href={`https://app.exfatloss.com/tee?unit=${unit}&protein=0.5&sex=${sex}&met=${metrics.teeMultiplier}&ffm=${leanMassInMatchingUnit}`} className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener">Total Energy Expenditure</a> ({Number(metrics.teeMultiplier).toFixed(2)}x): {totalEnergyExpenditure} kcal/day</p>
+                    <p><a href={`https://app.exfatloss.com/tee?unit=${linkedUnit}&protein=0.5&sex=${sex}&met=${metrics.teeMultiplier}&ffm=${linkedLeanMass}`} className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener">Total Energy Expenditure</a> ({Number(metrics.teeMultiplier).toFixed(2)}x): {totalEnergyExpenditure} kcal/day</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                         Estimated calories burned per day after applying the metabolism and activity multiplier.
                     </p>
@@ -504,7 +648,7 @@ const formatFatLossDuration = (days) => {
 };
 const FatLossProjection = ({ metrics }) => {
     const projection = calculateFatLossProjection(metrics);
-    const unit = metrics.unit === UNITS.METRIC ? 'kg' : 'lbs';
+    const unit = getWeightUnit(metrics.unit);
 
     return (
         <details className="group mt-6 p-4 bg-gray-100 dark:bg-gray-900 rounded">
@@ -595,7 +739,7 @@ export const renderFatLossProjection = (metrics) => (
 );
 export const ShareButton = ({ metrics, disabled = false }) => {
     const shareUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}${window.location.pathname}?${new URLSearchParams(metrics).toString()}`
+        ? `${window.location.origin}${window.location.pathname}?${serializeMetrics(metrics)}`
         : '';
     const copyToClipboard = async () => {
         try {
@@ -609,11 +753,17 @@ export const ShareButton = ({ metrics, disabled = false }) => {
     return (
         <Button
             variant="secondary"
+            size="icon"
             onClick={copyToClipboard}
             disabled={disabled}
-            className="whitespace-nowrap dark:text-gray-100 dark:bg-gray-700"
+            className="dark:text-gray-100 dark:bg-gray-700"
+            aria-label="Copy calculator link"
+            title="Copy calculator link"
         >
-            Share / Copy Link
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2" />
+                <path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" />
+            </svg>
         </Button>
     );
 };
