@@ -124,6 +124,7 @@ export const DEFAULT_METRICS = {
   inches: 2,
   enhanced: false,
   teeMultiplier: 1,
+  sensitivityEnabled: false,
   bodyFatUncertainty: 3,
   teeUncertainty: 0.1,
   barbieriFast: false,
@@ -274,6 +275,7 @@ export const normalizeMetrics = (metrics, fallback = DEFAULT_METRICS) => {
       TEE_MULTIPLIER_RANGE.min,
       TEE_MULTIPLIER_RANGE.max,
     ),
+    sensitivityEnabled: Boolean(metrics.sensitivityEnabled),
     bodyFatUncertainty: clamp(
       toFiniteNumber(
         metrics.bodyFatUncertainty,
@@ -777,13 +779,20 @@ export const calculateWeightLossChart = (metrics) => {
     return weightLossChartCache.get(cacheKey);
   }
 
+  const bodyFatUncertainty = normalized.sensitivityEnabled
+    ? normalized.bodyFatUncertainty
+    : 0;
+  const teeUncertainty = normalized.sensitivityEnabled
+    ? normalized.teeUncertainty
+    : 0;
   const chart = calculateWeightLossChartBase(normalized);
   if (chart.data.length === 0) {
     const emptyResult = {
       ...chart,
       sensitivity: {
-        bodyFat: normalized.bodyFatUncertainty,
-        tee: normalized.teeUncertainty,
+        enabled: normalized.sensitivityEnabled,
+        bodyFat: bodyFatUncertainty,
+        tee: teeUncertainty,
       },
     };
     weightLossChartCache.set(cacheKey, emptyResult);
@@ -794,22 +803,22 @@ export const calculateWeightLossChart = (metrics) => {
   }
 
   const bodyFatMinimum = clamp(
-    normalized.bodyFat - normalized.bodyFatUncertainty,
+    normalized.bodyFat - bodyFatUncertainty,
     BODY_FAT_RANGE.min,
     BODY_FAT_RANGE.max,
   );
   const bodyFatMaximum = clamp(
-    normalized.bodyFat + normalized.bodyFatUncertainty,
+    normalized.bodyFat + bodyFatUncertainty,
     BODY_FAT_RANGE.min,
     BODY_FAT_RANGE.max,
   );
   const teeMinimum = clamp(
-    normalized.teeMultiplier - normalized.teeUncertainty,
+    normalized.teeMultiplier - teeUncertainty,
     TEE_MULTIPLIER_RANGE.min,
     TEE_MULTIPLIER_RANGE.max,
   );
   const teeMaximum = clamp(
-    normalized.teeMultiplier + normalized.teeUncertainty,
+    normalized.teeMultiplier + teeUncertainty,
     TEE_MULTIPLIER_RANGE.min,
     TEE_MULTIPLIER_RANGE.max,
   );
@@ -864,8 +873,9 @@ export const calculateWeightLossChart = (metrics) => {
       };
     }),
     sensitivity: {
-      bodyFat: normalized.bodyFatUncertainty,
-      tee: normalized.teeUncertainty,
+      enabled: normalized.sensitivityEnabled,
+      bodyFat: bodyFatUncertainty,
+      tee: teeUncertainty,
     },
   };
   weightLossChartCache.set(cacheKey, result);
@@ -1030,6 +1040,13 @@ export const parseMetrics = (
           Math.min(TEE_MULTIPLIER_RANGE.max, value),
         ),
     ),
+    sensitivityEnabled: urlParams.has("sensitivityEnabled")
+      ? getUrlParam(
+          urlParams,
+          "sensitivityEnabled",
+          fallback.sensitivityEnabled,
+        )
+      : urlParams.has("bodyFatUncertainty") || urlParams.has("teeUncertainty"),
     bodyFatUncertainty: getUrlParam(
       urlParams,
       "bodyFatUncertainty",
@@ -1161,14 +1178,17 @@ export const calculateProjection = (metrics) => {
 export const calculateProjectionSensitivity = (metrics) => {
   const normalized = normalizeMetrics(metrics);
   const projection = calculateProjection(normalized);
+  const bodyFatUncertainty = normalized.sensitivityEnabled
+    ? normalized.bodyFatUncertainty
+    : 0;
   const scenarios = [
     clamp(
-      normalized.bodyFat - normalized.bodyFatUncertainty,
+      normalized.bodyFat - bodyFatUncertainty,
       BODY_FAT_RANGE.min,
       BODY_FAT_RANGE.max,
     ),
     clamp(
-      normalized.bodyFat + normalized.bodyFatUncertainty,
+      normalized.bodyFat + bodyFatUncertainty,
       BODY_FAT_RANGE.min,
       BODY_FAT_RANGE.max,
     ),

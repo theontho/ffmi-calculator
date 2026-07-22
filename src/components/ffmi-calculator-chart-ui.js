@@ -17,10 +17,17 @@ const getWeightUnit = (unit) =>
  *   active?: boolean,
  *   payload?: readonly ChartTooltipEntry[],
  *   label?: string | number,
- *   unit: string
+ *   unit: string,
+ *   sensitivityEnabled: boolean
  * }} props
  */
-const MuscleGainTooltip = ({ active = false, payload = [], label = '', unit }) => {
+const MuscleGainTooltip = ({
+    active = false,
+    payload = [],
+    label = '',
+    unit,
+    sensitivityEnabled,
+}) => {
     const point = payload?.[0]?.payload;
     if (!active || !point) return null;
     const ffmiGain = Number(point.ffmi) - Number(point.initialFFMI);
@@ -33,7 +40,7 @@ const MuscleGainTooltip = ({ active = false, payload = [], label = '', unit }) =
             <p className="font-medium">Month {label}</p>
             <p>Lean Mass ({unit}): {point.leanMassDisplay ?? point.leanMass}</p>
             <p>FFMI: {point.ffmi} ({ffmiGain >= 0 ? '+' : ''}{ffmiGain.toFixed(2)} points)</p>
-            {sensitivity.length === 2 && (
+            {sensitivityEnabled && sensitivity.length === 2 && (
                 <p className="text-gray-300">
                     Sensitivity: {Number(sensitivity[0]).toFixed(1)}–{Number(sensitivity[1]).toFixed(1)} {unit}
                 </p>
@@ -48,10 +55,18 @@ const MuscleGainTooltip = ({ active = false, payload = [], label = '', unit }) =
  *   payload?: readonly ChartTooltipEntry[],
  *   label?: string | number,
  *   unit: string,
- *   speeds: readonly FatLossSpeed[]
+ *   speeds: readonly FatLossSpeed[],
+ *   sensitivityEnabled: boolean
  * }} props
  */
-const WeightLossTooltip = ({ active = false, payload = [], label = '', unit, speeds }) => {
+const WeightLossTooltip = ({
+    active = false,
+    payload = [],
+    label = '',
+    unit,
+    speeds,
+    sensitivityEnabled,
+}) => {
     const point = payload?.[0]?.payload;
     if (!active || !point) return null;
 
@@ -66,7 +81,7 @@ const WeightLossTooltip = ({ active = false, payload = [], label = '', unit, spe
                             {speed.label} max: {Number(point[speed.id]).toFixed(1)} {unit}
                             {' · '}{Math.round(Number(point[`${speed.id}Deficit`]))} kcal/day
                         </p>
-                        {Array.isArray(sensitivity) && sensitivity.length === 2 && (
+                        {sensitivityEnabled && Array.isArray(sensitivity) && sensitivity.length === 2 && (
                             <p className="text-xs text-gray-300">
                                 Sensitivity: {Number(sensitivity[0]).toFixed(1)}–{Number(sensitivity[1]).toFixed(1)} {unit}
                             </p>
@@ -94,10 +109,11 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
         );
     }
 
+    const sensitivityEnabled = Boolean(metrics.sensitivityEnabled);
     const leanMassValues = ffmiData
         .flatMap((point) => [
             Number(point.leanMass),
-            ...(Array.isArray(point.leanMassSensitivity)
+            ...(sensitivityEnabled && Array.isArray(point.leanMassSensitivity)
                 ? point.leanMassSensitivity.map(Number)
                 : []),
         ])
@@ -133,21 +149,24 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                         />
                         Lean mass
                     </span>
-                    <span
-                        className="inline-flex items-center gap-1"
-                    >
-                        <span
-                            className="inline-block h-2 w-3 bg-emerald-600/20"
-                            aria-hidden="true"
-                        />
-                        Sensitivity
-                    </span>
+                    {sensitivityEnabled && (
+                        <span className="inline-flex items-center gap-1">
+                            <span
+                                className="inline-block h-2 w-3 bg-emerald-600/20"
+                                aria-hidden="true"
+                            />
+                            Sensitivity
+                        </span>
+                    )}
                 </span>
             </div>
             <div
                 className="mt-1 min-h-0 flex-1"
                 role="img"
-                aria-label={`Projected lean mass over ${metrics.years} years with a sensitivity envelope for plus or minus ${metrics.bodyFatUncertainty} body-fat percentage points`}
+                aria-label={sensitivityEnabled
+                    ? `Projected lean mass over ${metrics.years} years with a sensitivity envelope for plus or minus ${metrics.bodyFatUncertainty} body-fat percentage points`
+                    : `Projected lean mass over ${metrics.years} years`
+                }
             >
             <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
@@ -198,19 +217,22 @@ export const renderLineChart = (ffmiData, metrics, isValid = true) => {
                         <MuscleGainTooltip
                             {...tooltipProps}
                             unit={getWeightUnit(metrics.unit)}
+                            sensitivityEnabled={sensitivityEnabled}
                         />
                     )}
                 />
-                <Area
-                    yAxisId="leanMass"
-                    type="monotone"
-                    dataKey="leanMassSensitivity"
-                    stroke="none"
-                    fill="#059669"
-                    fillOpacity={0.28}
-                    isAnimationActive={false}
-                    name="Sensitivity envelope"
-                />
+                {sensitivityEnabled && (
+                    <Area
+                        yAxisId="leanMass"
+                        type="monotone"
+                        dataKey="leanMassSensitivity"
+                        stroke="none"
+                        fill="#059669"
+                        fillOpacity={0.28}
+                        isAnimationActive={false}
+                        name="Sensitivity envelope"
+                    />
+                )}
                 <Line
                     yAxisId="leanMass"
                     type="monotone"
@@ -285,12 +307,13 @@ export const renderWeightLossChart = (metrics) => {
     if (projection.data.length === 0) return null;
 
     const unit = getWeightUnit(metrics.unit);
+    const sensitivityEnabled = Boolean(projection.sensitivity.enabled);
     const projectedWeights = projection.data.flatMap((point) =>
         projection.speeds.flatMap((speed) => {
             const sensitivity = point[`${speed.id}Sensitivity`];
             return [
                 Number(point[speed.id]),
-                ...(Array.isArray(sensitivity)
+                ...(sensitivityEnabled && Array.isArray(sensitivity)
                     ? sensitivity.map(Number)
                     : []),
             ];
@@ -326,19 +349,24 @@ export const renderWeightLossChart = (metrics) => {
                             {speed.label} max
                         </span>
                     ))}
-                    <span className="inline-flex items-center gap-1">
-                        <span
-                            className="inline-block h-2 w-3 bg-blue-600/20"
-                            aria-hidden="true"
-                        />
-                        Matching shading: sensitivity
-                    </span>
+                    {sensitivityEnabled && (
+                        <span className="inline-flex items-center gap-1">
+                            <span
+                                className="inline-block h-2 w-3 bg-blue-600/20"
+                                aria-hidden="true"
+                            />
+                            Matching shading: sensitivity
+                        </span>
+                    )}
                 </div>
             </div>
             <div
                 className="mt-1 min-h-0 flex-1"
                 role="img"
-                aria-label={`Projected weight in ${unit} at four dynamic fat-loss speeds, each with a sensitivity envelope using plus or minus ${projection.sensitivity.bodyFat} body-fat percentage points and ${projection.sensitivity.tee} TEE multiplier`}
+                aria-label={sensitivityEnabled
+                    ? `Projected weight in ${unit} at four dynamic fat-loss speeds, each with a sensitivity envelope using plus or minus ${projection.sensitivity.bodyFat} body-fat percentage points and ${projection.sensitivity.tee} TEE multiplier`
+                    : `Projected weight in ${unit} at four dynamic fat-loss speeds`
+                }
             >
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
@@ -365,6 +393,7 @@ export const renderWeightLossChart = (metrics) => {
                                     {...tooltipProps}
                                     unit={unit}
                                     speeds={projection.speeds}
+                                    sensitivityEnabled={sensitivityEnabled}
                                 />
                             )}
                         />
@@ -411,7 +440,7 @@ export const renderWeightLossChart = (metrics) => {
                                 strokeDasharray="3 3"
                             />
                         ))}
-                        {projection.speeds.map((speed) => (
+                        {sensitivityEnabled && projection.speeds.map((speed) => (
                             <Area
                                 key={`${speed.id}-sensitivity`}
                                 yAxisId="weight"

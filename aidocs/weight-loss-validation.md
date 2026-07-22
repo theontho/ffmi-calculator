@@ -27,7 +27,7 @@ validate the fat-versus-lean partition.
 | CALERIE Phase 1 synthetic operating point | 9.2 kg mixed-sex CR endpoint at 6 months | Pooled-male baseline; 25%-maximum curve, 8.4 kg at day 183 | -0.8 kg (-8.8%) | Illustrative comparison, not validation |
 | CALERIE Phase 1 synthetic lean-mass comparison | 3.3 kg mixed-sex CR FFM loss | Pooled-male baseline; 0.67 kg modeled lean loss | -80% | Illustrates sensitivity to the Forbes partition, not a matched estimate |
 | CALERIE Phase 2 mixed CR cohort | 7.5 kg loss at 24 months | 25%-maximum curve reaches the female Stage lean target after 644 days, 19.6 kg loss | +12.1 kg | Sustained-speed scenario overpredicts a long trial with 11.9% achieved restriction and adherence decay |
-| Friedl Ranger training | 12.6 kg loss in 56 days | 100%-maximum curve, 6.4 kg at day 61 | -49% | Lean, exercise-heavy semi-starvation exceeds the adipose-flux cap |
+| Friedl Army training cohort | 12.6 kg loss in 56 days | 100%-maximum curve, 6.4 kg at day 61 | -49% | Lean, exercise-heavy semi-starvation exceeds the adipose-flux cap |
 | Angus Barbieri case report | 276 lb loss in 382 days | Supervised-fast, 1.20x TEE, interpolated 100%-maximum curve | within 3 lb | Extreme-obesity scale-weight comparison, not a general fasting validation |
 
 ### CALERIE Phase 1
@@ -62,13 +62,15 @@ This mismatch is expected from a sustained-capacity scenario applied to a trial
 with incomplete and declining adherence. It shows why the curves should not be
 read as forecasts of what a diet assignment will produce.
 
-### Friedl Ranger cohort
+### Friedl Army training cohort
 
-A [Ranger training study](https://doi.org/10.1152/jappl.1994.77.1.15) observed 55 already-lean men during eight weeks of intense Ranger
-training. Body fat fell from 14.3% to 5.8% and body weight by 15.7%, with an
-estimated 1,195 kcal/day deficit. At a representative 176 lb starting weight,
-the calculator's adipose-flux ceiling is about 805 kcal/day. Its maximum curve
-therefore loses only about half the observed scale weight.
+Friedl and colleagues' [Army combat leadership training
+study](https://pubmed.ncbi.nlm.nih.gov/8002550/) observed 55 young men during
+eight weeks of strenuous exercise and low energy intake. Body fat fell from
+14.3% to 5.8% and body weight by 15.7%, with an estimated 5.0 MJ/day
+(approximately 1,195 kcal/day) energy deficit. At a representative 176 lb
+starting weight, the calculator's adipose-flux ceiling is about 805 kcal/day.
+Its maximum curve therefore loses only about half the observed scale weight.
 
 This is an operating-range boundary, not evidence that the cap is a universal
 physiological hard limit. Semi-starvation combined with heavy exercise in lean
@@ -91,5 +93,5 @@ people is outside the calculator's intended dynamic scenario.
 | CALERIE Phase 1 | [Primary source](https://pmc.ncbi.nlm.nih.gov/articles/PMC2692623/) |
 | CALERIE Phase 2 feasibility | [Primary source](https://pubmed.ncbi.nlm.nih.gov/26187233/) |
 | CALERIE Phase 2 endpoint | [Primary source](https://doi.org/10.1016/S2213-8587(19)30151-2) |
-| Ranger training | [Primary source](https://doi.org/10.1152/jappl.1994.77.1.15) |
+| Army combat leadership training | [Friedl et al., 1994](https://pubmed.ncbi.nlm.nih.gov/8002550/) |
 | Barbieri fast | [Primary source](https://pmc.ncbi.nlm.nih.gov/articles/PMC2495396/) |

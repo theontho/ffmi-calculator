@@ -62,7 +62,7 @@ export const renderBackgroundAndSources = () => (
                 {' '}at age 40. These are starting estimates rather than recommendations; shared URL inputs override them.
             </p>
             <p>
-                Shaded sensitivity bands recalculate the muscle projection and each weight-loss speed across the selected body-fat and TEE error ranges. The +/-3 body-fat-point and +/-0.10 TEE defaults are optimistic low-uncertainty starting points informed by{' '}
+                Optional shaded sensitivity bands can be enabled under advanced fat-loss settings. They recalculate the muscle projection and each weight-loss speed across the selected body-fat and TEE error ranges. The +/-3 body-fat-point and +/-0.10 presets are optimistic low-uncertainty starting points informed by{' '}
                 <a href="https://doi.org/10.1016/j.nut.2024.112494" target="_blank" className="text-blue-500 hover:text-blue-700 underline" rel="noopener">DXA comparison error</a>,
                 {' '}individual{' '}
                 <a href="https://doi.org/10.1038/s41598-024-66767-7" target="_blank" className="text-blue-500 hover:text-blue-700 underline" rel="noopener">TEE prediction error</a>,

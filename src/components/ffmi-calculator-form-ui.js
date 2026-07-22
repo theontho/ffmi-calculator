@@ -431,70 +431,94 @@ export const renderOptions = (metrics, setMetrics) => {
                         Scales average TEE for individual metabolism and activity. Use 1.00x unless you have expenditure data or want a sensitivity range.
                     </p>
                     <div className="mt-5 border-t pt-4 dark:border-gray-700">
-                        <p className="text-sm font-medium">Projection sensitivity</p>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Choose how uncertain the body-fat and TEE inputs may be. Graph bands show the resulting what-if range, not a confidence interval.
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2" aria-label="Sensitivity presets">
-                            {uncertaintyPresets.map((preset) => {
-                                const active =
-                                    Number(metrics.bodyFatUncertainty) === preset.bodyFat &&
-                                    Number(metrics.teeUncertainty) === preset.tee;
-                                return (
-                                    <button
-                                        key={preset.label}
-                                        type="button"
-                                        aria-pressed={active}
-                                        onClick={() => setMetrics(prev => ({
-                                            ...prev,
-                                            bodyFatUncertainty: preset.bodyFat,
-                                            teeUncertainty: preset.tee,
-                                        }))}
-                                        className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
-                                            active
-                                                ? 'border-blue-600 bg-blue-600 text-white'
-                                                : 'border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800'
-                                        }`}
-                                    >
-                                        {preset.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label htmlFor="body-fat-uncertainty" className="block text-xs font-medium">
-                                    Body-fat uncertainty (± percentage points)
-                                </label>
-                                <input
-                                    id="body-fat-uncertainty"
-                                    name="bodyFatUncertainty"
-                                    type="number"
-                                    value={metrics.bodyFatUncertainty}
-                                    onChange={updateMetric}
-                                    min={BODY_FAT_UNCERTAINTY_RANGE.min}
-                                    max={BODY_FAT_UNCERTAINTY_RANGE.max}
-                                    step="0.5"
-                                    className="mt-1 w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                                />
+                        <label className="flex cursor-pointer items-start gap-2">
+                            <input
+                                id="sensitivity-enabled"
+                                type="checkbox"
+                                name="sensitivityEnabled"
+                                checked={Boolean(metrics.sensitivityEnabled)}
+                                onChange={(event) => setMetrics(prev => ({
+                                    ...prev,
+                                    sensitivityEnabled: event.target.checked,
+                                }))}
+                                className="mt-0.5 h-5 w-5"
+                            />
+                            <span>
+                                <span className="block text-sm font-medium">
+                                    Show projection sensitivity
+                                </span>
+                                <span className="block text-xs text-gray-500 dark:text-gray-400">
+                                    Adds what-if graph bands for body-fat and TEE input uncertainty.
+                                </span>
+                            </span>
+                        </label>
+                        {metrics.sensitivityEnabled && (
+                            <div className="mt-4">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Choose how uncertain the inputs may be. Bands are not confidence intervals.
+                                </p>
+                                <div className="mt-3 flex flex-wrap gap-2" aria-label="Sensitivity presets">
+                                    {uncertaintyPresets.map((preset) => {
+                                        const active =
+                                            Number(metrics.bodyFatUncertainty) === preset.bodyFat &&
+                                            Number(metrics.teeUncertainty) === preset.tee;
+                                        return (
+                                            <button
+                                                key={preset.label}
+                                                type="button"
+                                                aria-pressed={active}
+                                                onClick={() => setMetrics(prev => ({
+                                                    ...prev,
+                                                    bodyFatUncertainty: preset.bodyFat,
+                                                    teeUncertainty: preset.tee,
+                                                }))}
+                                                className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                                    active
+                                                        ? 'border-blue-600 bg-blue-600 text-white'
+                                                        : 'border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800'
+                                                }`}
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label htmlFor="body-fat-uncertainty" className="block text-xs font-medium">
+                                            Body-fat uncertainty (± percentage points)
+                                        </label>
+                                        <input
+                                            id="body-fat-uncertainty"
+                                            name="bodyFatUncertainty"
+                                            type="number"
+                                            value={metrics.bodyFatUncertainty}
+                                            onChange={updateMetric}
+                                            min={BODY_FAT_UNCERTAINTY_RANGE.min}
+                                            max={BODY_FAT_UNCERTAINTY_RANGE.max}
+                                            step="0.5"
+                                            className="mt-1 w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="tee-uncertainty" className="block text-xs font-medium">
+                                            TEE uncertainty (± multiplier)
+                                        </label>
+                                        <input
+                                            id="tee-uncertainty"
+                                            name="teeUncertainty"
+                                            type="number"
+                                            value={metrics.teeUncertainty}
+                                            onChange={updateMetric}
+                                            min={TEE_UNCERTAINTY_RANGE.min}
+                                            max={TEE_UNCERTAINTY_RANGE.max}
+                                            step="0.01"
+                                            className="mt-1 w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <label htmlFor="tee-uncertainty" className="block text-xs font-medium">
-                                    TEE uncertainty (± multiplier)
-                                </label>
-                                <input
-                                    id="tee-uncertainty"
-                                    name="teeUncertainty"
-                                    type="number"
-                                    value={metrics.teeUncertainty}
-                                    onChange={updateMetric}
-                                    min={TEE_UNCERTAINTY_RANGE.min}
-                                    max={TEE_UNCERTAINTY_RANGE.max}
-                                    step="0.01"
-                                    className="mt-1 w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                                />
-                            </div>
-                        </div>
+                        )}
                     </div>
                     <label className="mt-4 flex items-start gap-2 cursor-pointer">
                         <input
