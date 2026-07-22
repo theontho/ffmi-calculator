@@ -1,0 +1,14 @@
+{
+  "extends": [
+    "next/core-web-vitals",
+    "plugin:next-seo/recommended"
+  ],
+  "plugins": [
+    "next-seo"
+  ],
+  "rules": {
+    "next-seo/no-duplicate-title-and-meta": "error",
+    "next-seo/no-missing-alt": "error",
+    "next-seo/no-duplicate-meta-tags": "error"
+  }
+} 

@@ -1,0 +1,10 @@
+{
+    "configurations": [
+        {
+            "type": "chrome",
+            "name": "http://localhost:3000/?weight=178&height=71&bodyFat=25&age=27&sex=male&unit=imperial&feet=5&inches=11&enhanced=false&years=4&trainingLevel=DEDICATED",
+            "request": "launch",
+            "url": "http://localhost:3000/?weight=178&height=71&bodyFat=25&age=27&sex=male&unit=imperial&feet=5&inches=11&enhanced=false&years=4&trainingLevel=DEDICATED"
+        }
+    ]
+}
