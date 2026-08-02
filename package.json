@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
+    "ffmi": "node bin/ffmi.mjs",
     "generate:locale-data": "node scripts/generate-locale-defaults.mjs",
     "build": "next build",
     "build:pages": "GITHUB_ACTIONS=true GITHUB_REPOSITORY=theontho/ffmi-calculator next build",
@@ -48,5 +49,8 @@
     "postcss": "^8.5.21",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3"
+  },
+  "bin": {
+    "ffmi": "./bin/ffmi.mjs"
   }
 }
