@@ -15,6 +15,7 @@ Use the calculator at [theontho.github.io/ffmi-calculator](https://theontho.gith
 - Selectable population defaults for 190 locale regions
 - Metric, imperial, and UK stone/pound input modes
 - Shareable URLs that preserve calculator settings
+- Terminal CLI sharing the same calculation module as the web UI
 - Static GitHub Pages deployment with optional privacy-focused analytics
 
 ## Scope
@@ -51,6 +52,62 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## CLI
+
+The same calculations are available in the terminal. The CLI imports
+`src/lib/ffmi-calculator.mjs` directly, so it always agrees with the web UI and
+needs no build step.
+
+```bash
+npm run ffmi -- --help
+# or
+node bin/ffmi.mjs --help
+```
+
+```bash
+# Imperial, 6'2" 220 lbs at 32% body fat
+node bin/ffmi.mjs --feet 6 --inches 2 --weight 220 --body-fat 32 --age 40
+
+# Metric, elite programming, 5 year projection
+node bin/ffmi.mjs -u metric -w 82 -H 178 -b 22 -a 30 -t elite -y 5
+
+# UK stone input
+node bin/ffmi.mjs -u uk --stones 15 --stone-pounds 7 --feet 5 --inches 10 -b 28
+
+# Load a shared calculator link, or emit machine readable output
+node bin/ffmi.mjs --url "weight=200&bodyFat=25&age=35"
+node bin/ffmi.mjs --section loss --format json | jq '.fatLoss.targets'
+node bin/ffmi.mjs --format csv > projection.csv
+```
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `-w, --weight <n>` | Body weight (kg, lbs, or total lbs for `uk`) | `220` lbs |
+| `-H, --height <n>` | Height in cm, or inches for imperial/uk | `74` in |
+| `--feet` / `--inches` | Imperial height parts | `6` / `2` |
+| `--stones` / `--stone-pounds` | UK weight parts | — |
+| `-b, --body-fat <n>` | Body fat percentage | `32` |
+| `-a, --age <n>` | Age in years | `40` |
+| `-s, --sex <male\|female>` | Biological sex | `male` |
+| `-u, --unit <metric\|imperial\|uk>` | Unit system | `imperial` |
+| `-t, --training <level>` | `maintenance`, `recreational`, `dedicated`, `elite` | `dedicated` |
+| `-y, --years <n>` | Projection length, 1–10 | `4` |
+| `-e, --enhanced` | Enhanced (PED) parameters | `false` |
+| `--tee-multiplier <n>` | Activity multiplier on expenditure | `1` |
+| `--fast` | Aggressive fasting model | `false` |
+| `--section <all\|gain\|loss>` | Which sections to print | `all` |
+| `--interval <n>` | Months between gain table rows | `6` |
+| `-f, --format <table\|json\|csv>` | Output format | `table` |
+| `--url <query\|url>` | Load inputs from a shared link | — |
+| `--share` | Always print the shareable URL | — |
+| `--no-chart` / `--no-color` | Disable the ASCII chart / ANSI colors | — |
+
+Output covers current stats (lean and fat mass, FFMI, BMI, expenditure, maximum
+deficit), an ASCII muscle-gain chart with FFMI reference bands, a month-by-month
+gain table, and a fat-loss timeline giving the time to reach each leaner body-fat
+band at four deficit speeds. Formulas are documented in
+[`aidocs/model-methodology.md`](aidocs/model-methodology.md).
+
 ## Validation
 
 ```bash
@@ -62,7 +119,7 @@ npm run test:pages
 npm run test:e2e
 ```
 
-Unit tests cover calculation and URL semantics. Playwright runs the interactive
+Unit tests cover calculation, CLI, and URL semantics. Playwright runs the interactive
 calculator suite and serious/critical axe accessibility checks in desktop and
 mobile Chromium. CI also validates that every GitHub Pages asset is emitted
 beneath the repository base path. `npm run build` writes the static export to
