@@ -75,7 +75,7 @@ Output:
 Examples:
   node bin/ffmi.mjs --feet 6 --inches 2 --weight 220 --body-fat 32 --age 40
   node bin/ffmi.mjs -u metric -w 82 -H 178 -b 22 -a 30 -t elite -y 5
-  node bin/ffmi.mjs -u uk -w 15.5 --feet 5 --inches 10 -b 28
+  node bin/ffmi.mjs -u uk --stones 15 --stone-pounds 7 --feet 5 --inches 10 -b 28
   node bin/ffmi.mjs --section loss --format json | jq '.fatLoss.targets'
   node bin/ffmi.mjs --url "weight=200&bodyFat=25&age=35"
 `;
@@ -325,6 +325,12 @@ const parseArgs = (argv) => {
   }
 
   if (stones !== null || stonePounds !== null) {
+    if (overrides.unit && overrides.unit !== UNITS.UK) {
+      throw new UsageError(
+        "--stones/--stone-pounds are UK units and cannot be combined with --unit " +
+          `${String(overrides.unit).toLowerCase()}`,
+      );
+    }
     if (!overrides.unit) draft.unit = UNITS.UK;
     draft.stones = stones ?? draft.stones ?? 0;
     draft.stonePounds = stonePounds ?? draft.stonePounds ?? 0;
@@ -338,6 +344,11 @@ const parseArgs = (argv) => {
   }
 
   if (feet !== null || inches !== null) {
+    if (overrides.unit === UNITS.METRIC) {
+      throw new UsageError(
+        "--feet/--inches are imperial units and cannot be combined with --unit metric; use --height for centimetres",
+      );
+    }
     if (!overrides.unit && draft.unit === UNITS.METRIC) {
       draft.unit = UNITS.IMPERIAL;
     }
@@ -351,8 +362,9 @@ const parseArgs = (argv) => {
 
   const weightRange = WEIGHT_RANGES[draft.unit];
   if (draft.weight < weightRange.min || draft.weight > weightRange.max) {
+    const bound = draft.weight < weightRange.min ? weightRange.min : weightRange.max;
     process.stderr.write(
-      `warning: weight ${draft.weight} is outside ${weightRange.min}-${weightRange.max} ${draft.unit === UNITS.METRIC ? "kg" : "lbs"} and was reset\n`,
+      `warning: weight ${draft.weight} is outside ${weightRange.min}-${weightRange.max} ${draft.unit === UNITS.METRIC ? "kg" : "lbs"} and was clamped to ${bound}\n`,
     );
   }
 
@@ -402,7 +414,7 @@ const formatInputWeight = (metrics) =>
 
 const formatDuration = (days) => {
   if (days === null || days === undefined) return "—";
-  if (days < 31) return `${days}d`;
+  if (days < 31) return `${Math.round(days)}d`;
   const months = days / 30.4375;
   if (months < 18) return `${months.toFixed(1)}mo`;
   return `${(days / 365.25).toFixed(1)}y`;

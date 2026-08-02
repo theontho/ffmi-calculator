@@ -92,9 +92,9 @@ node bin/ffmi.mjs --format csv > projection.csv
 | `-u, --unit <metric\|imperial\|uk>` | Unit system | `imperial` |
 | `-t, --training <level>` | `maintenance`, `recreational`, `dedicated`, `elite` | `dedicated` |
 | `-y, --years <n>` | Projection length, 1–10 | `4` |
-| `-e, --enhanced` | Enhanced (PED) parameters | off |
+| `-e, --enhanced` | Enhanced (PED) parameters | `false` |
 | `--tee-multiplier <n>` | Activity multiplier on expenditure | `1` |
-| `--fast` | Aggressive fasting model | off |
+| `--fast` | Aggressive fasting model | `false` |
 | `--section <all\|gain\|loss>` | Which sections to print | `all` |
 | `--interval <n>` | Months between gain table rows | `6` |
 | `-f, --format <table\|json\|csv>` | Output format | `table` |

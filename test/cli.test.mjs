@@ -178,3 +178,54 @@ test("emits csv headers for both sections", async () => {
   const loss = await runCli(["--format", "csv", "--section", "loss"]);
   assert.match(loss.split("\n")[0], /^bodyFat,band,targetWeight_lbs/);
 });
+
+test("rejects stone flags combined with a non-uk unit", async () => {
+  await assert.rejects(
+    runCli(["--stones", "13", "--stone-pounds", "3", "--unit", "metric"]),
+    (error) => {
+      assert.equal(error.code, 2);
+      assert.match(error.stderr, /--stones\/--stone-pounds are UK units/);
+      return true;
+    },
+  );
+
+  const uk = await runCliJson([
+    "--stones",
+    "13",
+    "--stone-pounds",
+    "3",
+    "--unit",
+    "uk",
+  ]);
+  assert.equal(uk.input.unit, "uk");
+});
+
+test("rejects feet/inches combined with metric units", async () => {
+  await assert.rejects(
+    runCli(["--feet", "6", "--inches", "2", "--unit", "metric"]),
+    (error) => {
+      assert.equal(error.code, 2);
+      assert.match(error.stderr, /--feet\/--inches are imperial units/);
+      return true;
+    },
+  );
+
+  const imperial = await runCliJson(["--feet", "6", "--inches", "2"]);
+  assert.equal(imperial.input.unit, "imperial");
+  assert.equal(imperial.input.height, 74);
+});
+
+test("prints whole days in fat loss durations", async () => {
+  const stdout = await runCli([
+    "--section",
+    "loss",
+    "--body-fat",
+    "32",
+    "--no-color",
+  ]);
+  const days = stdout.match(/\b\d+(\.\d+)?d\b/g) ?? [];
+  assert.ok(days.length > 0, "expected at least one day-scale duration");
+  for (const value of days) {
+    assert.doesNotMatch(value, /\./, `day durations should be whole: ${value}`);
+  }
+});
